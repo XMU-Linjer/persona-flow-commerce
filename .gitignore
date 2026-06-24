@@ -1,0 +1,39 @@
+﻿# IntelliJ IDEA
+.idea/
+*.iml
+out/
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+
+# Node.js
+node_modules/
+dist/
+.vite/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Local environment and secrets
+.env
+*.env.local
+
+# Logs
+*.log
+logs/
+
+# Operating system
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.swp
