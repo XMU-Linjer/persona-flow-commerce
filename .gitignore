@@ -3,11 +3,17 @@
 *.iml
 out/
 
+# VS Code
+.vscode/
+
 # Java / Maven
 target/
 *.class
 *.jar
 *.war
+
+# Keep Maven Wrapper
+!.mvn/wrapper/maven-wrapper.jar
 
 # Node.js
 node_modules/
@@ -23,7 +29,11 @@ venv/
 
 # Local environment and secrets
 .env
-*.env.local
+.env.local
+.env.*.local
+
+# Keep environment template
+!.env.example
 
 # Logs
 *.log
