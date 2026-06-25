@@ -1,7 +1,7 @@
-﻿services:
+services:
   mysql:
     image: mysql:8.4
-    container_name: shop-agent-mysql
+    container_name: persona-flow-commerce-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -27,7 +27,7 @@
 
   redis:
     image: redis:7.4
-    container_name: shop-agent-redis
+    container_name: persona-flow-commerce-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -48,7 +48,7 @@
 
   rabbitmq:
     image: rabbitmq:4-management
-    container_name: shop-agent-rabbitmq
+    container_name: persona-flow-commerce-rabbitmq
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
