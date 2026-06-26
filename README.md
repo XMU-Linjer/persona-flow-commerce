@@ -83,9 +83,9 @@ V1.0 使用模块化单体，不拆微服务
 - [x] RabbitMQ 4 Management
 - [x] Docker Compose 基础设施
 - [x] V1.0 架构设计
-- [ ] Spring Boot 工程
-- [ ] Vue 工程
-- [ ] Java 连接 MySQL、Redis、RabbitMQ
+- [x] Spring Boot 工程
+- [x] Vue 工程
+- [x] Java 连接 MySQL、Redis、RabbitMQ
 - [ ] 用户登录
 - [ ] 商品和搜索
 - [ ] 收藏和购物车
