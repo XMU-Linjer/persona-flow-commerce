@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Set;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -93,6 +94,46 @@ class SecurityConfigTest {
     @Test
     void changePasswordWithoutTokenReturnsUnauthorized() throws Exception {
         mockMvc.perform(put("/api/users/me/password"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNAUTHORIZED"));
+    }
+
+    @Test
+    void listAddressesWithoutTokenReturnsUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/users/me/addresses"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNAUTHORIZED"));
+    }
+
+    @Test
+    void createAddressWithoutTokenReturnsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/users/me/addresses"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNAUTHORIZED"));
+    }
+
+    @Test
+    void updateAddressWithoutTokenReturnsUnauthorized() throws Exception {
+        mockMvc.perform(put("/api/users/me/addresses/10"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNAUTHORIZED"));
+    }
+
+    @Test
+    void deleteAddressWithoutTokenReturnsUnauthorized() throws Exception {
+        mockMvc.perform(delete("/api/users/me/addresses/10"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNAUTHORIZED"));
+    }
+
+    @Test
+    void setDefaultAddressWithoutTokenReturnsUnauthorized() throws Exception {
+        mockMvc.perform(put("/api/users/me/addresses/10/default"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(1))
                 .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNAUTHORIZED"));

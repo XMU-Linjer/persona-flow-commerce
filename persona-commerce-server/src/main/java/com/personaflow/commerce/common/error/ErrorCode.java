@@ -13,6 +13,7 @@ public enum ErrorCode {
     ACCOUNT_UNAUTHORIZED("ACCOUNT_UNAUTHORIZED", HttpStatus.UNAUTHORIZED, "Authentication is required"),
     ACCOUNT_FORBIDDEN("ACCOUNT_FORBIDDEN", HttpStatus.FORBIDDEN, "Access is denied"),
     ACCOUNT_USER_NOT_FOUND("ACCOUNT_USER_NOT_FOUND", HttpStatus.NOT_FOUND, "Current user was not found"),
+    ACCOUNT_ADDRESS_NOT_FOUND("ACCOUNT_ADDRESS_NOT_FOUND", HttpStatus.NOT_FOUND, "Address not found"),
     ACCOUNT_CURRENT_PASSWORD_INVALID("ACCOUNT_CURRENT_PASSWORD_INVALID", HttpStatus.BAD_REQUEST, "Current password is invalid"),
     ACCOUNT_PASSWORD_INVALID("ACCOUNT_PASSWORD_INVALID", HttpStatus.BAD_REQUEST, "Password format is invalid"),
     ADDRESS_NOT_FOUND("ADDRESS_NOT_FOUND", HttpStatus.NOT_FOUND, "Address not found"),
