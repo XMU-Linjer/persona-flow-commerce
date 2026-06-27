@@ -46,14 +46,14 @@ JWT 生成与校验
 收货地址增删改查
 普通用户与管理员角色
 为 shopping 提供当前 userId
-为 trade 提供当前 userId 与地址快照
+为 trade 提供当前用户身份与地址快照
 ```
 
 ### 2.2 本版本不完成
 
 ```txt
-手机号登录
-邮箱登录
+手机号登录身份
+邮箱登录身份
 短信验证码
 OAuth 第三方登录
 找回密码
@@ -65,6 +65,8 @@ Refresh Token
 管理员分配或撤销角色
 用户注销账户
 ```
+
+这里的“手机号不实现”只指手机号登录、短信验证码和手机号登录身份；`user_address.recipient_phone` 仍然保留，作为收货地址联系电话。
 
 ### 2.3 admin 与 account 的关系
 
@@ -238,7 +240,7 @@ erDiagram
 | `id` | BIGINT | PK | 内部用户 ID，不可修改 |
 | `display_name` | VARCHAR(50) | NOT NULL | 前端展示名称，可以重复 |
 | `password_hash` | VARCHAR(100) | NOT NULL | BCrypt 密码摘要 |
-| `avatar_url` | VARCHAR(500) | NULL | 头像地址，V1.0 不实现上传 |
+| `avatar_url` | VARCHAR(500) | NULL | 头像 URL，可作为可选字符串修改；V1.0 不实现上传、对象存储、裁剪或审核 |
 | `created_at` | DATETIME | NOT NULL | 创建时间 |
 | `updated_at` | DATETIME | NOT NULL | 更新时间 |
 
@@ -276,6 +278,8 @@ UNIQUE(identity_type, normalized_identifier)
 | `id` | BIGINT | PK | 角色 ID |
 | `code` | VARCHAR(50) | UNIQUE, NOT NULL | `ROLE_USER` 或 `ROLE_ADMIN` |
 | `name` | VARCHAR(50) | NOT NULL | 展示名称 |
+
+Flyway 初始化必须写入 `ROLE_USER`、`ROLE_ADMIN`、一个普通演示用户和一个管理员演示用户。演示账号只用于初始化、联调和权限验证，不代表 V1.0 提供管理员账户管理能力。
 
 ## 4.5 `sys_user_role`
 
@@ -322,6 +326,7 @@ UNIQUE(user_id, role_id)
 ## 5. HTTP 接口约定
 
 所有成功和失败响应使用统一的 `ApiResponse<T>`。
+`ApiResponse.code` 保持 `int`；字符串业务错误码使用 `errorCode` 表示，例如 `ACCOUNT_USERNAME_EXISTS`、`ACCOUNT_UNAUTHORIZED`。不得把 `ApiResponse.code` 改成字符串。
 
 ## 5.1 注册
 
@@ -504,6 +509,8 @@ displayName
 avatarUrl
 ```
 
+`avatarUrl` 只作为可选字符串字段修改；V1.0 不实现头像上传、对象存储、裁剪或审核。
+
 禁止修改：
 
 ```txt
@@ -597,7 +604,7 @@ sub 使用 userId
 有效期 2 小时
 使用配置文件中的密钥签名
 密钥从环境变量读取
-不把密码、地址、手机号等敏感或易变数据放进 Token
+不把密码、地址、收货联系电话等敏感或易变数据放进 Token
 ```
 
 ---
@@ -750,7 +757,6 @@ public interface CurrentUserProvider {
 ```java
 public record CurrentUser(
         Long userId,
-        String username,
         Set<String> roles
 ) {
 }
@@ -780,11 +786,12 @@ public record AddressSnapshot(
 用途：
 
 ```txt
-shopping 使用 CurrentUserProvider 取得 userId
-trade 使用 CurrentUserProvider 取得 userId
+shopping 使用 CurrentUserProvider 取得当前 userId 和 roles
+trade 使用 CurrentUserProvider 取得当前 userId 和 roles
 trade 使用 AddressQueryApi 获取经过归属校验的地址快照
 admin 只使用 Spring Security 角色校验，不调用账户管理能力
-V1.0 不提供没有真实调用方的通用 UserQueryApi
+V1.0 不提供没有真实调用方的通用 UserQueryApi 或 UserSummary
+前端 `/api/users/me` 仍可返回 username，但这是 account HTTP 接口自身查询结果，不属于跨模块约定
 ```
 
 ---
@@ -803,6 +810,7 @@ V1.0 不提供没有真实调用方的通用 UserQueryApi
 | `ADDRESS_NOT_OWNED` | 403 | 地址不属于当前用户 |
 
 登录失败统一返回“账号或密码错误”，不能向外区分用户名不存在和密码错误。
+失败响应中，`ApiResponse.code` 仍为 `int`，上表中的字符串值放入 `errorCode` 字段。
 
 ---
 
@@ -839,8 +847,9 @@ username 大小写不同仍视为重复
 不存在的账号返回相同的 401 错误
 无 Token 访问受保护接口返回 401
 无效或过期 Token 返回 401
-普通用户访问 admin 接口返回 403
-管理员访问 admin 接口成功
+验证 ROLE_ADMIN 权限规则：普通用户不满足 ROLE_ADMIN 时返回 403
+验证 ROLE_ADMIN 权限规则：拥有 ROLE_ADMIN 的认证请求可以通过权限校验
+account 阶段不新增生产环境 admin 业务 Controller，可通过测试专用端点或 Security 配置测试验证权限规则
 ```
 
 ### 13.3 用户资料
@@ -867,7 +876,7 @@ trade 可以取得经过归属校验的 AddressSnapshot
 ```txt
 mvn test 通过
 Spring Boot 启动成功
-Flyway 可以从空数据库完成迁移
+Flyway 可以从空数据库完成 account 表、ROLE_USER、ROLE_ADMIN、一个普通演示用户和一个管理员演示用户初始化
 Vue 可以完成注册、登录、资料、密码和地址联调
 ```
 
@@ -887,8 +896,9 @@ docs/modules/01-account.md
 
 ```txt
 只实现 account 所需的 auth 和 user 包
-不得实现封号、角色管理、邮箱、手机号、OAuth 和 Refresh Token
+不得实现封号、角色管理、邮箱登录、手机号登录身份、短信验证码、OAuth、Refresh Token 和服务端 Token 黑名单
 不得在 admin 中新增账户管理接口
+account 阶段不得新增生产环境 admin 业务 Controller
 不得把密码、passwordHash 或完整地址写入 JWT
 不得让 shopping 或 trade 直接调用 account Mapper
 不得自行修改已确定的 HTTP 路径和跨模块 Java 接口
