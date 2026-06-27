@@ -1,5 +1,6 @@
 package com.personaflow.commerce.auth.security;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
@@ -8,7 +9,9 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -45,7 +48,31 @@ public class JwtService {
         return properties.getExpiresIn();
     }
 
+    public AuthenticatedUser parseAuthenticatedUser(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(signingKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        return new AuthenticatedUser(
+                Long.valueOf(claims.getSubject()),
+                parseRoles(claims.get("roles"))
+        );
+    }
+
     private SecretKey signingKey() {
         return Keys.hmacShaKeyFor(properties.getSecret().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private Set<String> parseRoles(Object rolesClaim) {
+        if (!(rolesClaim instanceof Collection<?> roles)) {
+            return Set.of();
+        }
+
+        Set<String> parsedRoles = new LinkedHashSet<>();
+        for (Object role : roles) {
+            parsedRoles.add(String.valueOf(role));
+        }
+        return parsedRoles;
     }
 }
