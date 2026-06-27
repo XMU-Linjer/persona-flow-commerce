@@ -16,7 +16,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.Set;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -58,8 +60,39 @@ class SecurityConfigTest {
     }
 
     @Test
+    void actuatorHealthAllowsAnonymousAccess() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("health"));
+    }
+
+    @Test
     void protectedEndpointWithoutTokenReturnsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/protected"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNAUTHORIZED"));
+    }
+
+    @Test
+    void getCurrentUserWithoutTokenReturnsUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/users/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNAUTHORIZED"));
+    }
+
+    @Test
+    void updateProfileWithoutTokenReturnsUnauthorized() throws Exception {
+        mockMvc.perform(patch("/api/users/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNAUTHORIZED"));
+    }
+
+    @Test
+    void changePasswordWithoutTokenReturnsUnauthorized() throws Exception {
+        mockMvc.perform(put("/api/users/me/password"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(1))
                 .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNAUTHORIZED"));
