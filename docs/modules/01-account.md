@@ -1,4 +1,4 @@
-# PersonaFlow Commerce：account 模块技术设计
+# 01-account 模块设计
 
 > 文档类型：技术设计  
 > 目标读者：项目协作者、代码审查者、面试官、Codex  
