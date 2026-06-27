@@ -1,6 +1,7 @@
 package com.personaflow.commerce.auth.controller;
 
 import com.personaflow.commerce.auth.service.AuthService;
+import com.personaflow.commerce.auth.vo.LoginVO;
 import com.personaflow.commerce.auth.vo.RegisterVO;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
@@ -94,5 +95,73 @@ class AuthControllerRegisterTest {
                 .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"));
 
         verifyNoInteractions(authService);
+    }
+
+    @Test
+    void loginReturnsSuccessResponse() throws Exception {
+        when(authService.login(any()))
+                .thenReturn(new LoginVO(
+                        "access-token",
+                        "Bearer",
+                        7200L,
+                        new LoginVO.LoginUserVO(10003L, "linjer_01", "Linjer", java.util.Set.of("ROLE_USER"))
+                ));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "identityType": "USERNAME",
+                                  "identifier": "linjer_01",
+                                  "password": "Example123!"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.data.expiresIn").value(7200))
+                .andExpect(jsonPath("$.data.user.id").value(10003))
+                .andExpect(jsonPath("$.data.user.username").value("linjer_01"))
+                .andExpect(jsonPath("$.data.user.displayName").value("Linjer"))
+                .andExpect(jsonPath("$.data.user.roles[0]").value("ROLE_USER"));
+    }
+
+    @Test
+    void invalidLoginCredentialsReturnBusinessError() throws Exception {
+        when(authService.login(any()))
+                .thenThrow(new BusinessException(ErrorCode.ACCOUNT_INVALID_CREDENTIALS));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "identityType": "USERNAME",
+                                  "identifier": "linjer_01",
+                                  "password": "Wrong123!"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_INVALID_CREDENTIALS"));
+    }
+
+    @Test
+    void unsupportedIdentityTypeReturnsBusinessError() throws Exception {
+        when(authService.login(any()))
+                .thenThrow(new BusinessException(ErrorCode.ACCOUNT_UNSUPPORTED_IDENTITY_TYPE));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "identityType": "EMAIL",
+                                  "identifier": "linjer@example.com",
+                                  "password": "Example123!"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNSUPPORTED_IDENTITY_TYPE"));
     }
 }

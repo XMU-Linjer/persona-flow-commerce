@@ -1,8 +1,11 @@
 package com.personaflow.commerce.auth.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.personaflow.commerce.auth.dto.LoginRequest;
 import com.personaflow.commerce.auth.dto.RegisterRequest;
+import com.personaflow.commerce.auth.security.JwtService;
 import com.personaflow.commerce.auth.support.LoginIdentityNormalizer;
+import com.personaflow.commerce.auth.vo.LoginVO;
 import com.personaflow.commerce.auth.vo.RegisterVO;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
@@ -19,6 +22,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
 @Service
 public class AuthService {
 
@@ -29,18 +37,21 @@ public class AuthService {
     private final LoginIdentityMapper loginIdentityMapper;
     private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
+    private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public AuthService(
             UserMapper userMapper,
             LoginIdentityMapper loginIdentityMapper,
             RoleMapper roleMapper,
-            UserRoleMapper userRoleMapper
+            UserRoleMapper userRoleMapper,
+            JwtService jwtService
     ) {
         this.userMapper = userMapper;
         this.loginIdentityMapper = loginIdentityMapper;
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
+        this.jwtService = jwtService;
     }
 
     @Transactional
@@ -71,6 +82,42 @@ public class AuthService {
         return new RegisterVO(user.getId(), username, user.getDisplayName());
     }
 
+    public LoginVO login(LoginRequest request) {
+        String identityType = normalizeIdentityType(request.identityType());
+        if (!USERNAME_IDENTITY_TYPE.equals(identityType)) {
+            throw new BusinessException(ErrorCode.ACCOUNT_UNSUPPORTED_IDENTITY_TYPE);
+        }
+
+        String normalizedIdentifier = LoginIdentityNormalizer.normalizeUsername(request.identifier());
+        LoginIdentityEntity identity = loginIdentityMapper.selectOne(
+                Wrappers.<LoginIdentityEntity>lambdaQuery()
+                        .eq(LoginIdentityEntity::getIdentityType, identityType)
+                        .eq(LoginIdentityEntity::getNormalizedIdentifier, normalizedIdentifier)
+        );
+        if (identity == null) {
+            throw invalidCredentials();
+        }
+
+        UserEntity user = userMapper.selectById(identity.getUserId());
+        if (user == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw invalidCredentials();
+        }
+
+        Set<String> roles = loadRoleCodes(user.getId());
+        String accessToken = jwtService.generateAccessToken(user.getId(), roles);
+        return new LoginVO(
+                accessToken,
+                "Bearer",
+                jwtService.expiresIn(),
+                new LoginVO.LoginUserVO(
+                        user.getId(),
+                        identity.getIdentifier(),
+                        user.getDisplayName(),
+                        roles
+                )
+        );
+    }
+
     private void ensureUsernameAvailable(String normalizedIdentifier) {
         Long count = loginIdentityMapper.selectCount(
                 Wrappers.<LoginIdentityEntity>lambdaQuery()
@@ -91,6 +138,37 @@ public class AuthService {
             throw new IllegalStateException("ROLE_USER is not initialized");
         }
         return role;
+    }
+
+    private Set<String> loadRoleCodes(Long userId) {
+        List<UserRoleEntity> userRoles = userRoleMapper.selectList(
+                Wrappers.<UserRoleEntity>lambdaQuery()
+                        .eq(UserRoleEntity::getUserId, userId)
+        );
+        List<Long> roleIds = userRoles.stream()
+                .map(UserRoleEntity::getRoleId)
+                .toList();
+        if (roleIds.isEmpty()) {
+            return Set.of();
+        }
+
+        List<RoleEntity> roles = roleMapper.selectList(
+                Wrappers.<RoleEntity>lambdaQuery()
+                        .in(RoleEntity::getId, roleIds)
+        );
+        Set<String> roleCodes = new LinkedHashSet<>();
+        for (RoleEntity role : roles) {
+            roleCodes.add(role.getCode());
+        }
+        return roleCodes;
+    }
+
+    private String normalizeIdentityType(String identityType) {
+        return identityType.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private BusinessException invalidCredentials() {
+        return new BusinessException(ErrorCode.ACCOUNT_INVALID_CREDENTIALS);
     }
 
     private void expectOneRow(int affectedRows, String message) {

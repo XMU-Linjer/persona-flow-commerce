@@ -20,6 +20,11 @@ spring:
     username: ${RABBITMQ_DEFAULT_USER}
     password: ${RABBITMQ_DEFAULT_PASS}
 
+commerce:
+  jwt:
+    secret: ${COMMERCE_JWT_SECRET:local-development-jwt-secret-change-before-production}
+    expires-in: 7200
+
 management:
   endpoint:
     health:

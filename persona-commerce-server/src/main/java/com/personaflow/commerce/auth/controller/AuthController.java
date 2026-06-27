@@ -1,7 +1,9 @@
 package com.personaflow.commerce.auth.controller;
 
+import com.personaflow.commerce.auth.dto.LoginRequest;
 import com.personaflow.commerce.auth.dto.RegisterRequest;
 import com.personaflow.commerce.auth.service.AuthService;
+import com.personaflow.commerce.auth.vo.LoginVO;
 import com.personaflow.commerce.auth.vo.RegisterVO;
 import com.personaflow.commerce.common.api.ApiResponse;
 import jakarta.validation.Valid;
@@ -23,5 +25,10 @@ public class AuthController {
     @PostMapping("/register")
     public ApiResponse<RegisterVO> register(@Valid @RequestBody RegisterRequest request) {
         return ApiResponse.success(authService.register(request));
+    }
+
+    @PostMapping("/login")
+    public ApiResponse<LoginVO> login(@Valid @RequestBody LoginRequest request) {
+        return ApiResponse.success(authService.login(request));
     }
 }
