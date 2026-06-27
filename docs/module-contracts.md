@@ -1,6 +1,6 @@
 # PersonaFlow Commerce 模块约定
 
-> 状态：account 约定已确定，其他模块仍为骨架  
+> 状态：account 约定已确定，其他模块仍为骨架版  
 > 作用：确定模块之间允许如何调用，以及各模块需要向外提供什么能力  
 > 当前确定范围：调用规则、依赖方向、account 对外 Java 接口与模型  
 > 当前未确定范围：catalog、shopping、trade、behavior 的精确方法签名与模型  
