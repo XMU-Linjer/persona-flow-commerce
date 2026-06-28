@@ -1,7 +1,9 @@
 package com.personaflow.commerce.order.service;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
+import com.personaflow.commerce.common.vo.PageResult;
 import com.personaflow.commerce.inventory.service.InventoryService;
 import com.personaflow.commerce.order.dto.CreateOrderItemRequest;
 import com.personaflow.commerce.order.dto.CreateOrderRequest;
@@ -11,7 +13,13 @@ import com.personaflow.commerce.order.mapper.TradeOrderItemMapper;
 import com.personaflow.commerce.order.mapper.TradeOrderMapper;
 import com.personaflow.commerce.order.support.OrderNoGenerator;
 import com.personaflow.commerce.order.vo.OrderCreateVO;
+import com.personaflow.commerce.order.vo.OrderAddressVO;
+import com.personaflow.commerce.order.vo.OrderDetailVO;
 import com.personaflow.commerce.order.vo.OrderItemVO;
+import com.personaflow.commerce.order.vo.OrderListItemVO;
+import com.personaflow.commerce.payment.entity.PaymentRecordEntity;
+import com.personaflow.commerce.payment.mapper.PaymentRecordMapper;
+import com.personaflow.commerce.payment.vo.PaymentVO;
 import com.personaflow.commerce.product.api.ProductQueryApi;
 import com.personaflow.commerce.product.api.model.ProductSnapshot;
 import com.personaflow.commerce.user.api.AddressQueryApi;
@@ -32,9 +40,13 @@ import java.util.Set;
 public class OrderService {
 
     public static final int STATUS_PENDING_PAYMENT = 10;
+    private static final int DEFAULT_PAGE = 1;
+    private static final int DEFAULT_SIZE = 10;
+    private static final int MAX_SIZE = 100;
 
     private final TradeOrderMapper tradeOrderMapper;
     private final TradeOrderItemMapper tradeOrderItemMapper;
+    private final PaymentRecordMapper paymentRecordMapper;
     private final CurrentUserProvider currentUserProvider;
     private final AddressQueryApi addressQueryApi;
     private final ProductQueryApi productQueryApi;
@@ -44,6 +56,7 @@ public class OrderService {
     public OrderService(
             TradeOrderMapper tradeOrderMapper,
             TradeOrderItemMapper tradeOrderItemMapper,
+            PaymentRecordMapper paymentRecordMapper,
             CurrentUserProvider currentUserProvider,
             AddressQueryApi addressQueryApi,
             ProductQueryApi productQueryApi,
@@ -52,6 +65,7 @@ public class OrderService {
     ) {
         this.tradeOrderMapper = tradeOrderMapper;
         this.tradeOrderItemMapper = tradeOrderItemMapper;
+        this.paymentRecordMapper = paymentRecordMapper;
         this.currentUserProvider = currentUserProvider;
         this.addressQueryApi = addressQueryApi;
         this.productQueryApi = productQueryApi;
@@ -126,6 +140,79 @@ public class OrderService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public PageResult<OrderListItemVO> listOrders(Integer status, Integer page, Integer size) {
+        Long userId = currentUserProvider.requireCurrentUser().userId();
+        int normalizedPage = normalizePage(page);
+        int normalizedSize = normalizeSize(size);
+
+        List<TradeOrderEntity> orders = tradeOrderMapper.selectList(
+                Wrappers.<TradeOrderEntity>lambdaQuery()
+                        .eq(TradeOrderEntity::getUserId, userId)
+                        .eq(status != null, TradeOrderEntity::getStatus, status)
+                        .orderByDesc(TradeOrderEntity::getCreatedAt)
+                        .orderByDesc(TradeOrderEntity::getId)
+        );
+        if (orders.isEmpty()) {
+            return new PageResult<>(List.of(), normalizedPage, normalizedSize, 0);
+        }
+
+        int fromIndex = Math.min((normalizedPage - 1) * normalizedSize, orders.size());
+        int toIndex = Math.min(fromIndex + normalizedSize, orders.size());
+        return new PageResult<>(
+                orders.subList(fromIndex, toIndex)
+                        .stream()
+                        .map(this::toOrderListItemVO)
+                        .toList(),
+                normalizedPage,
+                normalizedSize,
+                orders.size()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public OrderDetailVO getOrderDetail(Long orderId) {
+        Long userId = currentUserProvider.requireCurrentUser().userId();
+        TradeOrderEntity order = tradeOrderMapper.selectOne(
+                Wrappers.<TradeOrderEntity>lambdaQuery()
+                        .eq(TradeOrderEntity::getId, orderId)
+                        .eq(TradeOrderEntity::getUserId, userId)
+        );
+        if (order == null) {
+            throw new BusinessException(ErrorCode.TRADE_ORDER_NOT_FOUND);
+        }
+
+        List<OrderItemVO> items = tradeOrderItemMapper.selectList(
+                        Wrappers.<TradeOrderItemEntity>lambdaQuery()
+                                .eq(TradeOrderItemEntity::getOrderId, order.getId())
+                                .eq(TradeOrderItemEntity::getUserId, userId)
+                                .orderByAsc(TradeOrderItemEntity::getId)
+                )
+                .stream()
+                .map(this::toOrderItemVO)
+                .toList();
+
+        PaymentRecordEntity paymentRecord = paymentRecordMapper.selectOne(
+                Wrappers.<PaymentRecordEntity>lambdaQuery()
+                        .eq(PaymentRecordEntity::getOrderId, order.getId())
+                        .eq(PaymentRecordEntity::getUserId, userId)
+        );
+
+        return new OrderDetailVO(
+                order.getId(),
+                order.getOrderNo(),
+                order.getUserId(),
+                toOrderAddressVO(order),
+                order.getTotalAmount(),
+                order.getStatus(),
+                order.getCreatedAt(),
+                order.getPaidAt(),
+                order.getCanceledAt(),
+                items,
+                toPaymentVO(paymentRecord)
+        );
+    }
+
     private void validateItems(List<CreateOrderItemRequest> items) {
         if (items == null || items.isEmpty()) {
             throw new BusinessException(ErrorCode.TRADE_ORDER_EMPTY_ITEMS);
@@ -192,6 +279,58 @@ public class OrderService {
                 orderItem.getQuantity(),
                 orderItem.getSubtotal()
         );
+    }
+
+    private OrderListItemVO toOrderListItemVO(TradeOrderEntity order) {
+        return new OrderListItemVO(
+                order.getId(),
+                order.getOrderNo(),
+                order.getTotalAmount(),
+                order.getStatus(),
+                order.getCreatedAt(),
+                order.getPaidAt(),
+                order.getCanceledAt()
+        );
+    }
+
+    private OrderAddressVO toOrderAddressVO(TradeOrderEntity order) {
+        return new OrderAddressVO(
+                order.getAddressId(),
+                order.getRecipientName(),
+                order.getRecipientPhone(),
+                order.getProvince(),
+                order.getCity(),
+                order.getDistrict(),
+                order.getDetailAddress(),
+                order.getPostalCode()
+        );
+    }
+
+    private PaymentVO toPaymentVO(PaymentRecordEntity paymentRecord) {
+        if (paymentRecord == null) {
+            return null;
+        }
+        return new PaymentVO(
+                paymentRecord.getPaymentNo(),
+                paymentRecord.getAmount(),
+                paymentRecord.getChannel(),
+                paymentRecord.getStatus(),
+                paymentRecord.getPaidAt()
+        );
+    }
+
+    private int normalizePage(Integer page) {
+        if (page == null || page < DEFAULT_PAGE) {
+            return DEFAULT_PAGE;
+        }
+        return page;
+    }
+
+    private int normalizeSize(Integer size) {
+        if (size == null || size < 1) {
+            return DEFAULT_SIZE;
+        }
+        return Math.min(size, MAX_SIZE);
     }
 
     private void expectOneRow(int affectedRows, String message) {

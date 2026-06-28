@@ -11,6 +11,7 @@ import com.personaflow.commerce.order.mapper.TradeOrderItemMapper;
 import com.personaflow.commerce.order.mapper.TradeOrderMapper;
 import com.personaflow.commerce.order.support.OrderNoGenerator;
 import com.personaflow.commerce.order.vo.OrderCreateVO;
+import com.personaflow.commerce.payment.mapper.PaymentRecordMapper;
 import com.personaflow.commerce.product.api.ProductQueryApi;
 import com.personaflow.commerce.product.api.model.ProductSnapshot;
 import com.personaflow.commerce.user.api.AddressQueryApi;
@@ -49,6 +50,9 @@ class OrderServiceCreateTest {
     private TradeOrderItemMapper tradeOrderItemMapper;
 
     @Mock
+    private PaymentRecordMapper paymentRecordMapper;
+
+    @Mock
     private CurrentUserProvider currentUserProvider;
 
     @Mock
@@ -70,6 +74,7 @@ class OrderServiceCreateTest {
         orderService = new OrderService(
                 tradeOrderMapper,
                 tradeOrderItemMapper,
+                paymentRecordMapper,
                 currentUserProvider,
                 addressQueryApi,
                 productQueryApi,
