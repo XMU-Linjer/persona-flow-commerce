@@ -1,48 +1,43 @@
 # PersonaFlow Commerce
 
-一个基于 Spring Boot 的电商项目
+PersonaFlow Commerce 是一个基于 Spring Boot 的模块化单体电商后端项目。
 
-当前开发版本为 **V1.0**。这一版本先完成纯电商平台和后端技术栈，后续版本再加入用户行为分析、实时兴趣识别和多 Agent 推荐
+当前状态：V1.0 后端核心链路已完成 account、catalog、shopping、trade 四个模块；behavior、RabbitMQ 行为事件、admin 管理端和 Agent 推荐仍属于后续阶段。
 
-## V1.0
+## V1.0 后端核心链路
 
-V1.0 计划完成基础电商链路：
-
-```text
-用户登录
-→ 浏览和搜索商品
-→ 收藏或加入购物车
-→ 创建订单
-→ 扣减库存
-→ 模拟支付
-→ 查询订单
-```
-
-用户在搜索、浏览、收藏、加购和购买时会产生行为事件。
+当前已完成的主链路：
 
 ```text
-业务操作
-→ RabbitMQ
-→ MySQL 保存行为记录
-→ Redis 更新搜索热词和近期兴趣数据
+用户注册 / 登录
+-> 浏览分类、商品列表、商品详情和 SKU
+-> 收藏 SKU 或加入购物车
+-> 通过 skuId + quantity 创建订单
+-> 锁定库存
+-> 取消待支付订单并释放库存
+-> 模拟支付并确认 locked 库存为 sold 库存
+-> 查询订单列表和订单详情
 ```
 
-这些数据会在 V1.1 中交给 Agent 使用。
-
-## 技术结构
+V1.0 当前不实现：
 
 ```text
-Vue 3
-   │
-   ▼
-Spring Boot
-   │
-   ├── MySQL
-   ├── Redis
-   └── RabbitMQ
+真实支付、退款、售后、物流、优惠券
+购物车结算接口
+behavior 事件发布
+RabbitMQ 行为消息
+admin 业务接口
+Agent 推荐
 ```
 
-V1.0 使用模块化单体，不拆微服务
+## 后端模块
+
+| 模块 | 当前职责 |
+| --- | --- |
+| account | 注册、登录、当前用户资料、密码修改、地址管理、CurrentUserProvider、AddressQueryApi |
+| catalog | 分类、SPU、SKU、商品列表、商品详情、商品详情 Redis 缓存、ProductQueryApi |
+| shopping | 收藏 SKU、取消收藏、收藏列表、购物车增删改查 |
+| trade | 库存、订单、订单查询、取消订单、模拟支付、payment_record |
 
 ## 技术栈
 
@@ -56,8 +51,10 @@ V1.0 使用模块化单体，不拆微服务
 - MyBatis-Plus
 - MySQL
 - Redis
-- RabbitMQ
 - Flyway
+- Maven
+- JUnit 5
+- Mockito
 
 ### 前端
 
@@ -67,42 +64,32 @@ V1.0 使用模块化单体，不拆微服务
 - Pinia
 - Element Plus
 
-### 开发与测试
-
-- Maven
-- Docker Compose
-- Git
-- JUnit 5
-- Mockito
-
 ## 当前进度
 
-- [x] Java、Node.js、Python、Git、Docker 环境
-- [x] MySQL 8.4
-- [x] Redis 7.4
-- [x] RabbitMQ 4 Management
 - [x] Docker Compose 基础设施
-- [x] V1.0 架构设计
-- [x] Spring Boot 工程
-- [x] Vue 工程
-- [x] Java 连接 MySQL、Redis、RabbitMQ
-- [ ] 用户登录
-- [ ] 商品和搜索
-- [ ] 收藏和购物车
-- [ ] 库存和订单
-- [ ] 用户行为事件
+- [x] Spring Boot 后端工程
+- [x] Vue 前端工程
+- [x] account 模块
+- [x] catalog 模块
+- [x] shopping 模块
+- [x] trade 模块
+- [x] 后端编译和全量测试通过
+- [ ] README / 接口文档展示收口
 - [ ] 前后端联调
-- [ ] V1.0 完成
+- [ ] behavior 模块
+- [ ] RabbitMQ 行为事件链路
+- [ ] admin 管理端
+- [ ] Agent 推荐
 
-## 版本计划
+## 版本规划
 
 ### V1.0
 
-完成纯电商平台、Redis 缓存和 RabbitMQ 用户行为链路。
+收口电商后端核心链路：账户、商品目录、收藏购物车、库存、订单、取消订单和模拟支付。
 
 ### V1.1
 
-加入 Behavior Agent、Intent Agent 和 Trend Agent，根据 V1.0 产生的用户行为生成用户画像。
+在 behavior 模块确认后，接入用户行为事件、兴趣统计和 Agent 可用的数据能力。
 
 ### V1.2
 
@@ -111,6 +98,11 @@ V1.0 使用模块化单体，不拆微服务
 ## 文档
 
 - [V1.0 架构设计](docs/v1.0-architecture.md)
+- [模块约定](docs/module-contracts.md)
+- [account 模块](docs/modules/01-account.md)
+- [catalog 模块](docs/modules/02-catalog.md)
+- [shopping 模块](docs/modules/03-shopping.md)
+- [trade 模块](docs/modules/04-trade.md)
 - [架构变更记录](docs/architecture-history.md)
 
 ## License
