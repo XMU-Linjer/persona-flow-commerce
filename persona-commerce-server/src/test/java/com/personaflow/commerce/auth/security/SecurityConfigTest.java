@@ -10,6 +10,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SecurityConfigTest.JwtServiceTestConfiguration.class
 })
 @EnableConfigurationProperties(JwtProperties.class)
+@ActiveProfiles("security-test")
 @TestPropertySource(properties = {
         "commerce.jwt.secret=test-jwt-secret-with-at-least-thirty-two-characters",
         "commerce.jwt.expires-in=7200"
