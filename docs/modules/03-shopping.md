@@ -560,7 +560,7 @@ updatedAt
 ```text
 subtotal = unitPrice * quantity
 subtotal 只是购物车展示金额，不是订单最终金额。
-创建订单时 trade 会重新获取商品快照和库存信息。
+创建订单时 trade 会重新获取商品快照并执行自己的下单校验。
 ```
 
 ## 7. 跨模块依赖
@@ -644,9 +644,9 @@ CartItemSnapshot
 
 这些留到 trade 模块设计时再确认。
 
-## 9. 错误码建议
+## 9. 错误码
 
-建议新增：
+当前使用：
 
 ```text
 SHOPPING_CART_ITEM_NOT_FOUND
@@ -671,7 +671,7 @@ CATALOG_PRODUCT_NOT_SELLABLE
 
 ```text
 quantity <= 0 返回 SHOPPING_INVALID_QUANTITY，HTTP 400
-cartItemId 不存在或不属于当前用户返回 SHOPPING_CART_ITEM_NOT_FOUND
+cartItemId 不存在或不属于当前用户返回 SHOPPING_CART_ITEM_NOT_FOUND，HTTP 404
 ```
 
 ## 10. 关键流程
