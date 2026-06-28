@@ -697,8 +697,8 @@ PaymentService 获取当前 userId
     -> 校验订单状态必须是 PENDING_PAYMENT
     -> 查询订单项
     -> 开启事务
+    -> 条件更新订单状态为 PAID
     -> 创建 payment_record
-    -> 修改订单状态为 PAID
     -> 将锁定库存转为已售库存
     -> 返回支付结果
 ```
@@ -1108,15 +1108,15 @@ CATALOG_PRODUCT_NOT_SELLABLE
 
 ```text
 前端请求 POST /api/trade/orders/{orderId}/pay
-    -> PaymentController 接收请求
+    -> OrderController 接收请求
     -> PaymentService 获取当前 userId
     -> 查询 orderId + userId 的订单
     -> 不存在则返回 TRADE_ORDER_NOT_FOUND
     -> 校验订单状态为 PENDING_PAYMENT
     -> 查询订单项
     -> 开启事务
+    -> 条件更新订单状态为 PAID
     -> 写入 payment_record
-    -> 更新订单状态为 PAID
     -> 确认库存，将 locked 转为 sold
     -> 返回支付结果
 ```
@@ -1163,14 +1163,15 @@ trade 属于“其他接口”，因此默认需要认证。
 
 ## 13. 包结构建议
 
-trade 模块由两个主要 Java 包组成：
+trade 模块由三个主要 Java 包组成：
 
 ```text
 inventory
 order
+payment
 ```
 
-模拟支付属于 `order` 包中的订单状态流转能力，V1.0 不单独创建 `payment` 包。
+模拟支付仍属于 trade 的订单状态流转能力。当前实现使用 `payment` 包承载模拟支付 DTO、Service、支付记录 Mapper/Entity、支付单号生成器和 VO，但 `payment` 不是独立业务模块。
 
 建议结构：
 
@@ -1187,6 +1188,14 @@ com.personaflow.commerce.order
 ├── vo
 ├── entity
 └── mapper
+
+com.personaflow.commerce.payment
+├── service
+├── dto
+├── vo
+├── entity
+├── mapper
+└── support
 ```
 
 建议类：
@@ -1222,9 +1231,10 @@ PaymentRecordEntity
 
 ```text
 模块名是 trade。
-内部包使用 inventory、order。
+内部包使用 inventory、order、payment。
 inventory 只处理库存数据和库存状态变化。
-order 处理订单创建、查询、取消和模拟支付。
+order 处理订单创建、查询、取消和订单 HTTP 入口。
+payment 处理模拟支付、支付记录和支付结果模型。
 ```
 
 ------

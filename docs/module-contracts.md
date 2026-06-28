@@ -95,7 +95,7 @@ trade 自己负责扣减库存和创建订单
 | account | auth、user |
 | catalog | product |
 | shopping | favorite、cart |
-| trade | inventory、order |
+| trade | inventory、order、payment |
 | behavior | behavior、messaging |
 
 `search` 包保留为 catalog 后续复杂搜索扩展方向，V1.0 不创建。简单关键词搜索由 `product` 包内的 `ProductService` 使用 MySQL LIKE 实现。
