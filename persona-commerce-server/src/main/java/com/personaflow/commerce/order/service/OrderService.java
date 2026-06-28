@@ -41,6 +41,7 @@ import java.util.Set;
 public class OrderService {
 
     public static final int STATUS_PENDING_PAYMENT = 10;
+    public static final int STATUS_PAID = 20;
     public static final int STATUS_CANCELED = 30;
     private static final int DEFAULT_PAGE = 1;
     private static final int DEFAULT_SIZE = 10;
@@ -355,6 +356,8 @@ public class OrderService {
         }
         return new PaymentVO(
                 paymentRecord.getPaymentNo(),
+                paymentRecord.getOrderId(),
+                paymentRecord.getOrderNo(),
                 paymentRecord.getAmount(),
                 paymentRecord.getChannel(),
                 paymentRecord.getStatus(),

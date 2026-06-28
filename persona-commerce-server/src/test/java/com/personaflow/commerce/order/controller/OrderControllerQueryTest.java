@@ -16,6 +16,7 @@ import com.personaflow.commerce.order.vo.OrderAddressVO;
 import com.personaflow.commerce.order.vo.OrderDetailVO;
 import com.personaflow.commerce.order.vo.OrderItemVO;
 import com.personaflow.commerce.order.vo.OrderListItemVO;
+import com.personaflow.commerce.payment.service.PaymentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -203,6 +204,11 @@ class OrderControllerQueryTest {
         @Bean
         OrderService orderService() {
             return mock(OrderService.class);
+        }
+
+        @Bean
+        PaymentService paymentService() {
+            return mock(PaymentService.class);
         }
 
         @Bean

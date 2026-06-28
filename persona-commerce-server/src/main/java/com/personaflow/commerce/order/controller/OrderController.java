@@ -8,6 +8,9 @@ import com.personaflow.commerce.order.vo.OrderCreateVO;
 import com.personaflow.commerce.order.vo.OrderDetailVO;
 import com.personaflow.commerce.order.vo.OrderListItemVO;
 import com.personaflow.commerce.order.vo.OrderStatusVO;
+import com.personaflow.commerce.payment.dto.PayOrderRequest;
+import com.personaflow.commerce.payment.service.PaymentService;
+import com.personaflow.commerce.payment.vo.PaymentVO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
@@ -25,9 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderController {
 
     private final OrderService orderService;
+    private final PaymentService paymentService;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, PaymentService paymentService) {
         this.orderService = orderService;
+        this.paymentService = paymentService;
     }
 
     @PostMapping
@@ -52,5 +57,13 @@ public class OrderController {
     @PostMapping("/{orderId}/cancel")
     public ApiResponse<OrderStatusVO> cancelOrder(@Positive @PathVariable Long orderId) {
         return ApiResponse.success(orderService.cancelOrder(orderId));
+    }
+
+    @PostMapping("/{orderId}/pay")
+    public ApiResponse<PaymentVO> payOrder(
+            @Positive @PathVariable Long orderId,
+            @Valid @RequestBody(required = false) PayOrderRequest request
+    ) {
+        return ApiResponse.success(paymentService.payOrder(orderId, request));
     }
 }

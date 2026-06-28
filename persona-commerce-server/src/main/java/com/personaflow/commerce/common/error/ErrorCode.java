@@ -33,7 +33,8 @@ public enum ErrorCode {
     TRADE_DUPLICATE_SKU("TRADE_DUPLICATE_SKU", HttpStatus.BAD_REQUEST, "Order items contain duplicate SKU"),
     TRADE_STOCK_NOT_FOUND("TRADE_STOCK_NOT_FOUND", HttpStatus.NOT_FOUND, "Stock was not found"),
     TRADE_STOCK_NOT_ENOUGH("TRADE_STOCK_NOT_ENOUGH", HttpStatus.CONFLICT, "Stock is not enough"),
-    TRADE_STOCK_STATE_INVALID("TRADE_STOCK_STATE_INVALID", HttpStatus.CONFLICT, "Stock state is invalid");
+    TRADE_STOCK_STATE_INVALID("TRADE_STOCK_STATE_INVALID", HttpStatus.CONFLICT, "Stock state is invalid"),
+    TRADE_PAYMENT_RECORD_EXISTS("TRADE_PAYMENT_RECORD_EXISTS", HttpStatus.CONFLICT, "Payment record already exists");
 
     private final String code;
     private final HttpStatus httpStatus;

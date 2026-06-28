@@ -27,4 +27,21 @@ public interface TradeOrderMapper extends BaseMapper<TradeOrderEntity> {
             @Param("canceledStatus") Integer canceledStatus,
             @Param("canceledAt") LocalDateTime canceledAt
     );
+
+    @Update("""
+            UPDATE trade_order
+            SET status = #{paidStatus},
+                paid_at = #{paidAt},
+                updated_at = #{paidAt}
+            WHERE id = #{orderId}
+              AND user_id = #{userId}
+              AND status = #{pendingStatus}
+            """)
+    int markOrderPaid(
+            @Param("orderId") Long orderId,
+            @Param("userId") Long userId,
+            @Param("pendingStatus") Integer pendingStatus,
+            @Param("paidStatus") Integer paidStatus,
+            @Param("paidAt") LocalDateTime paidAt
+    );
 }
