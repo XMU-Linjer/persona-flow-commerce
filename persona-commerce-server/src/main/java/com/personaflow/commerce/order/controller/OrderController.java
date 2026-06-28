@@ -7,6 +7,7 @@ import com.personaflow.commerce.order.service.OrderService;
 import com.personaflow.commerce.order.vo.OrderCreateVO;
 import com.personaflow.commerce.order.vo.OrderDetailVO;
 import com.personaflow.commerce.order.vo.OrderListItemVO;
+import com.personaflow.commerce.order.vo.OrderStatusVO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
@@ -46,5 +47,10 @@ public class OrderController {
     @GetMapping("/{orderId}")
     public ApiResponse<OrderDetailVO> getOrderDetail(@Positive @PathVariable Long orderId) {
         return ApiResponse.success(orderService.getOrderDetail(orderId));
+    }
+
+    @PostMapping("/{orderId}/cancel")
+    public ApiResponse<OrderStatusVO> cancelOrder(@Positive @PathVariable Long orderId) {
+        return ApiResponse.success(orderService.cancelOrder(orderId));
     }
 }

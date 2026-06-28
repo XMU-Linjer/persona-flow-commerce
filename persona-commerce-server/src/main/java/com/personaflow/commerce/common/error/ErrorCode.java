@@ -27,6 +27,7 @@ public enum ErrorCode {
     SHOPPING_INVALID_QUANTITY("SHOPPING_INVALID_QUANTITY", HttpStatus.BAD_REQUEST, "Quantity must be greater than 0"),
 
     TRADE_ORDER_NOT_FOUND("TRADE_ORDER_NOT_FOUND", HttpStatus.NOT_FOUND, "Order not found"),
+    TRADE_ORDER_STATUS_NOT_ALLOWED("TRADE_ORDER_STATUS_NOT_ALLOWED", HttpStatus.CONFLICT, "Order status is not allowed"),
     TRADE_INVALID_QUANTITY("TRADE_INVALID_QUANTITY", HttpStatus.BAD_REQUEST, "Quantity must be greater than 0"),
     TRADE_ORDER_EMPTY_ITEMS("TRADE_ORDER_EMPTY_ITEMS", HttpStatus.BAD_REQUEST, "Order items must not be empty"),
     TRADE_DUPLICATE_SKU("TRADE_DUPLICATE_SKU", HttpStatus.BAD_REQUEST, "Order items contain duplicate SKU"),

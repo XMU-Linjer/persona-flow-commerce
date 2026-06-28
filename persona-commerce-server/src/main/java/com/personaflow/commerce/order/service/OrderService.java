@@ -17,6 +17,7 @@ import com.personaflow.commerce.order.vo.OrderAddressVO;
 import com.personaflow.commerce.order.vo.OrderDetailVO;
 import com.personaflow.commerce.order.vo.OrderItemVO;
 import com.personaflow.commerce.order.vo.OrderListItemVO;
+import com.personaflow.commerce.order.vo.OrderStatusVO;
 import com.personaflow.commerce.payment.entity.PaymentRecordEntity;
 import com.personaflow.commerce.payment.mapper.PaymentRecordMapper;
 import com.personaflow.commerce.payment.vo.PaymentVO;
@@ -40,6 +41,7 @@ import java.util.Set;
 public class OrderService {
 
     public static final int STATUS_PENDING_PAYMENT = 10;
+    public static final int STATUS_CANCELED = 30;
     private static final int DEFAULT_PAGE = 1;
     private static final int DEFAULT_SIZE = 10;
     private static final int MAX_SIZE = 100;
@@ -211,6 +213,47 @@ public class OrderService {
                 items,
                 toPaymentVO(paymentRecord)
         );
+    }
+
+    @Transactional
+    public OrderStatusVO cancelOrder(Long orderId) {
+        Long userId = currentUserProvider.requireCurrentUser().userId();
+        TradeOrderEntity order = tradeOrderMapper.selectOne(
+                Wrappers.<TradeOrderEntity>lambdaQuery()
+                        .eq(TradeOrderEntity::getId, orderId)
+                        .eq(TradeOrderEntity::getUserId, userId)
+        );
+        if (order == null) {
+            throw new BusinessException(ErrorCode.TRADE_ORDER_NOT_FOUND);
+        }
+        if (!Integer.valueOf(STATUS_PENDING_PAYMENT).equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.TRADE_ORDER_STATUS_NOT_ALLOWED);
+        }
+
+        List<TradeOrderItemEntity> orderItems = tradeOrderItemMapper.selectList(
+                Wrappers.<TradeOrderItemEntity>lambdaQuery()
+                        .eq(TradeOrderItemEntity::getOrderId, order.getId())
+                        .eq(TradeOrderItemEntity::getUserId, userId)
+                        .orderByAsc(TradeOrderItemEntity::getId)
+        );
+
+        LocalDateTime canceledAt = LocalDateTime.now();
+        int affectedRows = tradeOrderMapper.cancelPendingOrder(
+                order.getId(),
+                userId,
+                STATUS_PENDING_PAYMENT,
+                STATUS_CANCELED,
+                canceledAt
+        );
+        if (affectedRows != 1) {
+            throw new BusinessException(ErrorCode.TRADE_ORDER_STATUS_NOT_ALLOWED);
+        }
+
+        for (TradeOrderItemEntity orderItem : orderItems) {
+            inventoryService.releaseLockedStock(orderItem.getSkuId(), orderItem.getQuantity());
+        }
+
+        return new OrderStatusVO(order.getId(), order.getOrderNo(), STATUS_CANCELED, canceledAt);
     }
 
     private void validateItems(List<CreateOrderItemRequest> items) {
