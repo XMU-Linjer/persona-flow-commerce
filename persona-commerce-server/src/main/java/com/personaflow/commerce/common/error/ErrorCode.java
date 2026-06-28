@@ -21,7 +21,10 @@ public enum ErrorCode {
 
     CATALOG_PRODUCT_NOT_FOUND("CATALOG_PRODUCT_NOT_FOUND", HttpStatus.NOT_FOUND, "Product not found"),
     CATALOG_SKU_NOT_FOUND("CATALOG_SKU_NOT_FOUND", HttpStatus.NOT_FOUND, "SKU not found"),
-    CATALOG_PRODUCT_NOT_SELLABLE("CATALOG_PRODUCT_NOT_SELLABLE", HttpStatus.CONFLICT, "Product is not sellable");
+    CATALOG_PRODUCT_NOT_SELLABLE("CATALOG_PRODUCT_NOT_SELLABLE", HttpStatus.CONFLICT, "Product is not sellable"),
+
+    SHOPPING_CART_ITEM_NOT_FOUND("SHOPPING_CART_ITEM_NOT_FOUND", HttpStatus.NOT_FOUND, "Cart item not found"),
+    SHOPPING_INVALID_QUANTITY("SHOPPING_INVALID_QUANTITY", HttpStatus.BAD_REQUEST, "Quantity must be greater than 0");
 
     private final String code;
     private final HttpStatus httpStatus;
