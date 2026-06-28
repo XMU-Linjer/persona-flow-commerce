@@ -17,7 +17,11 @@ public enum ErrorCode {
     ACCOUNT_CURRENT_PASSWORD_INVALID("ACCOUNT_CURRENT_PASSWORD_INVALID", HttpStatus.BAD_REQUEST, "Current password is invalid"),
     ACCOUNT_PASSWORD_INVALID("ACCOUNT_PASSWORD_INVALID", HttpStatus.BAD_REQUEST, "Password format is invalid"),
     ADDRESS_NOT_FOUND("ADDRESS_NOT_FOUND", HttpStatus.NOT_FOUND, "Address not found"),
-    ADDRESS_NOT_OWNED("ADDRESS_NOT_OWNED", HttpStatus.FORBIDDEN, "Address does not belong to current user");
+    ADDRESS_NOT_OWNED("ADDRESS_NOT_OWNED", HttpStatus.FORBIDDEN, "Address does not belong to current user"),
+
+    CATALOG_PRODUCT_NOT_FOUND("CATALOG_PRODUCT_NOT_FOUND", HttpStatus.NOT_FOUND, "Product not found"),
+    CATALOG_SKU_NOT_FOUND("CATALOG_SKU_NOT_FOUND", HttpStatus.NOT_FOUND, "SKU not found"),
+    CATALOG_PRODUCT_NOT_SELLABLE("CATALOG_PRODUCT_NOT_SELLABLE", HttpStatus.CONFLICT, "Product is not sellable");
 
     private final String code;
     private final HttpStatus httpStatus;

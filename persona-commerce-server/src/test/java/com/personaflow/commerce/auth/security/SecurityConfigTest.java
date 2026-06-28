@@ -68,6 +68,25 @@ class SecurityConfigTest {
     }
 
     @Test
+    void catalogEndpointsAllowAnonymousAccess() throws Exception {
+        mockMvc.perform(get("/api/catalog/categories"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("catalog-categories"));
+
+        mockMvc.perform(get("/api/catalog/products"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("catalog-products"));
+
+        mockMvc.perform(get("/api/catalog/products/20001"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("catalog-product-20001"));
+
+        mockMvc.perform(get("/api/catalog/skus/30001"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("catalog-sku-30001"));
+    }
+
+    @Test
     void protectedEndpointWithoutTokenReturnsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/protected"))
                 .andExpect(status().isUnauthorized())

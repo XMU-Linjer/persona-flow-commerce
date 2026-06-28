@@ -31,6 +31,26 @@ class TestSecurityController {
         return "protected";
     }
 
+    @GetMapping("/api/catalog/categories")
+    String catalogCategories() {
+        return "catalog-categories";
+    }
+
+    @GetMapping("/api/catalog/products")
+    String catalogProducts() {
+        return "catalog-products";
+    }
+
+    @GetMapping("/api/catalog/products/{spuId}")
+    String catalogProductDetail(@PathVariable Long spuId) {
+        return "catalog-product-" + spuId;
+    }
+
+    @GetMapping("/api/catalog/skus/{skuId}")
+    String catalogSkuDetail(@PathVariable Long skuId) {
+        return "catalog-sku-" + skuId;
+    }
+
     @GetMapping("/api/admin/check")
     String adminEndpoint() {
         return "admin";
