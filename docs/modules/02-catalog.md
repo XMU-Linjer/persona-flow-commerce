@@ -688,7 +688,8 @@ keyword 使用 MySQL LIKE。
 说明：
 
 ```text
-后续阶段可以对商品详情加 Redis 缓存。
+商品详情已接入 Redis 缓存。
+缓存异常时回退 MySQL 查询。
 ```
 
 ### 9.3 SKU 选择流程
@@ -726,7 +727,7 @@ ProductSnapshot 是跨模块快照，不是数据库 Entity。
 
 ## 10. Redis 缓存设计
 
-V1.0 catalog 可以对商品详情做简单 Redis 缓存。
+当前 V1.0 catalog 只对商品详情做 Redis 缓存。
 
 缓存 key：
 
@@ -740,26 +741,31 @@ catalog:product:detail:{spuId}
 ProductDetailVO JSON
 ```
 
-建议过期时间：
+当前过期时间：
 
 ```text
-30 分钟到 2 小时均可
+1 小时
 ```
 
 缓存策略：
 
 ```text
 查询商品详情时先查 Redis
+命中则直接返回 ProductDetailVO
 未命中再查 MySQL
-查到后写入 Redis
-商品上下架或商品信息变化时删除缓存
+MySQL 查询成功后写入 Redis
+Redis 读取或写入异常时回退 MySQL，不影响接口返回
+JSON 反序列化失败时删除该缓存 key，并回退 MySQL
+商品不存在或下架时不缓存错误结果
 ```
 
 说明：
 
 ```text
-Redis 缓存可以放到 catalog 后续阶段实现。
-第一阶段不需要实现 Redis。
+当前不实现缓存删除接口。
+V1.0 没有商品修改、商品上下架和 admin 商品管理。
+后续实现商品修改或上下架时，再删除 catalog:product:detail:{spuId}。
+分类树、商品列表、SKU 查询和 ProductQueryApi 当前不做缓存。
 ```
 
 ## 11. 安全规则
@@ -950,15 +956,17 @@ agent
 ```text
 商品详情 Redis 缓存
 catalog:product:detail:{spuId}
+TTL 1 小时
 缓存命中读取
 缓存未命中查 MySQL
+缓存异常回退 MySQL
 ```
 
 说明：
 
 ```text
-该阶段可选。
-如果时间紧，可以先跳过，后面再补。
+该阶段已完成。
+当前不实现缓存删除接口，后续商品管理能力落地后再补缓存失效。
 ```
 
 ### 阶段 5：文档同步和边界复查
@@ -1004,7 +1012,7 @@ catalog 是 V1.0 的商品目录模块。
 
 它不需要复杂，只需要把商品展示所需的数据记录清楚，并提供稳定的查询能力。
 
-V1.0 先使用 MySQL 实现简单查询和搜索，后续通过 Redis 缓存商品详情。
+V1.0 使用 MySQL 实现简单查询和搜索，并通过 Redis 缓存商品详情。
 
 catalog 的核心价值是：
 
