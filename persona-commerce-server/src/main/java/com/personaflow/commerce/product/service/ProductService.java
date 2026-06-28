@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.common.vo.PageResult;
+import com.personaflow.commerce.product.api.ProductQueryApi;
+import com.personaflow.commerce.product.api.model.ProductSnapshot;
 import com.personaflow.commerce.product.entity.ProductCategoryEntity;
 import com.personaflow.commerce.product.entity.ProductSkuEntity;
 import com.personaflow.commerce.product.entity.ProductSpuEntity;
@@ -24,15 +26,17 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-public class ProductService {
+public class ProductService implements ProductQueryApi {
 
     private static final int ENABLED_STATUS = 1;
     private static final int MAX_PAGE_SIZE = 100;
@@ -193,6 +197,97 @@ public class ProductService {
         );
     }
 
+    @Override
+    public ProductSnapshot requireSellableSku(Long skuId) {
+        if (skuId == null) {
+            throw new BusinessException(ErrorCode.CATALOG_SKU_NOT_FOUND);
+        }
+        return requireSellableSkus(List.of(skuId)).get(skuId);
+    }
+
+    @Override
+    public Map<Long, ProductSnapshot> requireSellableSkus(Collection<Long> skuIds) {
+        if (skuIds == null || skuIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Set<Long> requestedSkuIds = skuIds.stream()
+                .peek(skuId -> {
+                    if (skuId == null) {
+                        throw new BusinessException(ErrorCode.CATALOG_SKU_NOT_FOUND);
+                    }
+                })
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (requestedSkuIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, ProductSkuEntity> skuMap = skuMapper.selectByIds(requestedSkuIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        ProductSkuEntity::getId,
+                        Function.identity(),
+                        (left, right) -> left
+                ));
+        for (Long skuId : requestedSkuIds) {
+            ProductSkuEntity sku = skuMap.get(skuId);
+            if (sku == null) {
+                throw new BusinessException(ErrorCode.CATALOG_SKU_NOT_FOUND);
+            }
+            if (!isEnabled(sku.getStatus())) {
+                throw new BusinessException(ErrorCode.CATALOG_PRODUCT_NOT_SELLABLE);
+            }
+        }
+
+        Map<Long, ProductSpuEntity> spuMap = spuMapper.selectByIds(
+                        skuMap.values()
+                                .stream()
+                                .map(ProductSkuEntity::getSpuId)
+                                .collect(Collectors.toSet())
+                )
+                .stream()
+                .collect(Collectors.toMap(
+                        ProductSpuEntity::getId,
+                        Function.identity(),
+                        (left, right) -> left
+                ));
+
+        for (ProductSkuEntity sku : skuMap.values()) {
+            ProductSpuEntity spu = spuMap.get(sku.getSpuId());
+            if (spu == null) {
+                throw new BusinessException(ErrorCode.CATALOG_PRODUCT_NOT_FOUND);
+            }
+            if (!isEnabled(spu.getStatus())) {
+                throw new BusinessException(ErrorCode.CATALOG_PRODUCT_NOT_SELLABLE);
+            }
+        }
+
+        Map<Long, ProductCategoryEntity> categoryMap = categoryMapper.selectByIds(
+                        spuMap.values()
+                                .stream()
+                                .map(ProductSpuEntity::getCategoryId)
+                                .collect(Collectors.toSet())
+                )
+                .stream()
+                .collect(Collectors.toMap(
+                        ProductCategoryEntity::getId,
+                        Function.identity(),
+                        (left, right) -> left
+                ));
+
+        Map<Long, ProductSnapshot> snapshots = new LinkedHashMap<>();
+        for (Long skuId : requestedSkuIds) {
+            ProductSkuEntity sku = skuMap.get(skuId);
+            ProductSpuEntity spu = spuMap.get(sku.getSpuId());
+            ProductCategoryEntity category = categoryMap.get(spu.getCategoryId());
+            if (category == null || !isEnabled(category.getStatus())) {
+                throw new BusinessException(ErrorCode.CATALOG_PRODUCT_NOT_SELLABLE);
+            }
+            snapshots.put(skuId, toProductSnapshot(sku, spu, category));
+        }
+        return snapshots;
+    }
+
     private ProductSpuEntity requireSellableSpu(Long spuId) {
         ProductSpuEntity spu = spuMapper.selectById(spuId);
         if (spu == null) {
@@ -278,6 +373,23 @@ public class ProductService {
         );
     }
 
+    private ProductSnapshot toProductSnapshot(
+            ProductSkuEntity sku,
+            ProductSpuEntity spu,
+            ProductCategoryEntity category
+    ) {
+        return new ProductSnapshot(
+                sku.getId(),
+                spu.getId(),
+                category.getId(),
+                category.getName(),
+                spu.getName(),
+                sku.getSkuName(),
+                sku.getPrice(),
+                firstNonBlank(sku.getImageUrl(), spu.getMainImageUrl())
+        );
+    }
+
     private CategoryVO toCategoryVO(ProductCategoryEntity category) {
         return new CategoryVO(
                 category.getId(),
@@ -350,5 +462,9 @@ public class ProductService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String firstNonBlank(String first, String fallback) {
+        return isBlank(first) ? fallback : first;
     }
 }

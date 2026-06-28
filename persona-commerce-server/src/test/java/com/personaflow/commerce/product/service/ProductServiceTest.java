@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.common.vo.PageResult;
+import com.personaflow.commerce.product.api.model.ProductSnapshot;
 import com.personaflow.commerce.product.entity.ProductCategoryEntity;
 import com.personaflow.commerce.product.entity.ProductSkuEntity;
 import com.personaflow.commerce.product.entity.ProductSpuEntity;
@@ -22,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -144,6 +146,131 @@ class ProductServiceTest {
                 );
     }
 
+    @Test
+    void requireSellableSkuReturnsProductSnapshot() {
+        ProductSkuEntity sku = sku(30001L, 20001L, "青轴 白色", "{}", "459.00", 100);
+        ProductSpuEntity spu = spu(20001L, 201L, "KeyForge K3", "KeyForge", 1, 10);
+        ProductCategoryEntity category = category(201L, "键盘鼠标", 2L, 2, 21);
+        when(skuMapper.selectByIds(any())).thenReturn(List.of(sku));
+        when(spuMapper.selectByIds(any())).thenReturn(List.of(spu));
+        when(categoryMapper.selectByIds(any())).thenReturn(List.of(category));
+
+        ProductSnapshot snapshot = productService.requireSellableSku(30001L);
+
+        assertThat(snapshot.skuId()).isEqualTo(30001L);
+        assertThat(snapshot.spuId()).isEqualTo(20001L);
+        assertThat(snapshot.categoryId()).isEqualTo(201L);
+        assertThat(snapshot.categoryName()).isEqualTo("键盘鼠标");
+        assertThat(snapshot.productName()).isEqualTo("KeyForge K3");
+        assertThat(snapshot.skuName()).isEqualTo("青轴 白色");
+        assertThat(snapshot.unitPrice()).isEqualByComparingTo("459.00");
+        assertThat(snapshot.imageUrl()).isEqualTo("sku-30001.jpg");
+    }
+
+    @Test
+    void requireSellableSkuFallsBackToSpuMainImageWhenSkuImageIsBlank() {
+        ProductSkuEntity sku = sku(30001L, 20001L, "青轴 白色", "{}", "459.00", 100);
+        sku.setImageUrl(" ");
+        ProductSpuEntity spu = spu(20001L, 201L, "KeyForge K3", "KeyForge", 1, 10);
+        when(skuMapper.selectByIds(any())).thenReturn(List.of(sku));
+        when(spuMapper.selectByIds(any())).thenReturn(List.of(spu));
+        when(categoryMapper.selectByIds(any())).thenReturn(List.of(category(201L, "键盘鼠标", 2L, 2, 21)));
+
+        ProductSnapshot snapshot = productService.requireSellableSku(30001L);
+
+        assertThat(snapshot.imageUrl()).isEqualTo("spu-20001.jpg");
+    }
+
+    @Test
+    void requireSellableSkuRejectsMissingSku() {
+        when(skuMapper.selectByIds(any())).thenReturn(List.of());
+
+        assertCatalogError(
+                () -> productService.requireSellableSku(999L),
+                ErrorCode.CATALOG_SKU_NOT_FOUND
+        );
+    }
+
+    @Test
+    void requireSellableSkuRejectsOffShelfSku() {
+        ProductSkuEntity sku = sku(30001L, 20001L, "青轴 白色", "{}", "459.00", 100);
+        sku.setStatus(0);
+        when(skuMapper.selectByIds(any())).thenReturn(List.of(sku));
+
+        assertCatalogError(
+                () -> productService.requireSellableSku(30001L),
+                ErrorCode.CATALOG_PRODUCT_NOT_SELLABLE
+        );
+    }
+
+    @Test
+    void requireSellableSkuRejectsOffShelfSpu() {
+        when(skuMapper.selectByIds(any())).thenReturn(List.of(
+                sku(30001L, 20001L, "青轴 白色", "{}", "459.00", 100)
+        ));
+        when(spuMapper.selectByIds(any())).thenReturn(List.of(
+                spu(20001L, 201L, "KeyForge K3", "KeyForge", 0, 10)
+        ));
+
+        assertCatalogError(
+                () -> productService.requireSellableSku(30001L),
+                ErrorCode.CATALOG_PRODUCT_NOT_SELLABLE
+        );
+    }
+
+    @Test
+    void requireSellableSkuRejectsDisabledCategory() {
+        ProductCategoryEntity category = category(201L, "键盘鼠标", 2L, 2, 21);
+        category.setStatus(0);
+        when(skuMapper.selectByIds(any())).thenReturn(List.of(
+                sku(30001L, 20001L, "青轴 白色", "{}", "459.00", 100)
+        ));
+        when(spuMapper.selectByIds(any())).thenReturn(List.of(
+                spu(20001L, 201L, "KeyForge K3", "KeyForge", 1, 10)
+        ));
+        when(categoryMapper.selectByIds(any())).thenReturn(List.of(category));
+
+        assertCatalogError(
+                () -> productService.requireSellableSku(30001L),
+                ErrorCode.CATALOG_PRODUCT_NOT_SELLABLE
+        );
+    }
+
+    @Test
+    void requireSellableSkusReturnsSnapshotMap() {
+        ProductSkuEntity keyboardSku = sku(30001L, 20001L, "青轴 白色", "{}", "459.00", 100);
+        ProductSkuEntity mouseSku = sku(30002L, 20002L, "白色", "{}", "129.00", 200);
+        ProductSpuEntity keyboard = spu(20001L, 201L, "KeyForge K3", "KeyForge", 1, 10);
+        ProductSpuEntity mouse = spu(20002L, 201L, "SilentPro M8", "SilentPro", 1, 20);
+        when(skuMapper.selectByIds(any())).thenReturn(List.of(keyboardSku, mouseSku));
+        when(spuMapper.selectByIds(any())).thenReturn(List.of(keyboard, mouse));
+        when(categoryMapper.selectByIds(any())).thenReturn(List.of(category(201L, "键盘鼠标", 2L, 2, 21)));
+
+        Map<Long, ProductSnapshot> snapshots = productService.requireSellableSkus(List.of(30001L, 30002L));
+
+        assertThat(snapshots).containsOnlyKeys(30001L, 30002L);
+        assertThat(snapshots.get(30001L).productName()).isEqualTo("KeyForge K3");
+        assertThat(snapshots.get(30002L).unitPrice()).isEqualByComparingTo("129.00");
+    }
+
+    @Test
+    void requireSellableSkusRejectsAnyUnsellableSku() {
+        ProductSkuEntity first = sku(30001L, 20001L, "青轴 白色", "{}", "459.00", 100);
+        ProductSkuEntity second = sku(30002L, 20002L, "白色", "{}", "129.00", 200);
+        second.setStatus(0);
+        when(skuMapper.selectByIds(any())).thenReturn(List.of(first, second));
+
+        assertCatalogError(
+                () -> productService.requireSellableSkus(List.of(30001L, 30002L)),
+                ErrorCode.CATALOG_PRODUCT_NOT_SELLABLE
+        );
+    }
+
+    @Test
+    void requireSellableSkusReturnsEmptyMapForEmptyInput() {
+        assertThat(productService.requireSellableSkus(List.of())).isEmpty();
+    }
+
     private ProductCategoryEntity category(Long id, String name, Long parentId, Integer level, Integer sortOrder) {
         ProductCategoryEntity category = new ProductCategoryEntity();
         category.setId(id);
@@ -184,5 +311,12 @@ class ProductServiceTest {
         sku.setStatus(1);
         sku.setSalesCount(salesCount);
         return sku;
+    }
+
+    private void assertCatalogError(Runnable action, ErrorCode expectedErrorCode) {
+        assertThatThrownBy(action::run)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(expectedErrorCode)
+                );
     }
 }
