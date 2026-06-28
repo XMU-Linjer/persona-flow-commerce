@@ -9,6 +9,7 @@ import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.common.vo.PageResult;
 import com.personaflow.commerce.product.api.ProductQueryApi;
 import com.personaflow.commerce.product.api.model.ProductSnapshot;
+import com.personaflow.commerce.product.cache.ProductCacheService;
 import com.personaflow.commerce.product.entity.ProductCategoryEntity;
 import com.personaflow.commerce.product.entity.ProductSkuEntity;
 import com.personaflow.commerce.product.entity.ProductSpuEntity;
@@ -49,17 +50,20 @@ public class ProductService implements ProductQueryApi {
     private final ProductSpuMapper spuMapper;
     private final ProductSkuMapper skuMapper;
     private final ObjectMapper objectMapper;
+    private final ProductCacheService productCacheService;
 
     public ProductService(
             ProductCategoryMapper categoryMapper,
             ProductSpuMapper spuMapper,
             ProductSkuMapper skuMapper,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            ProductCacheService productCacheService
     ) {
         this.categoryMapper = categoryMapper;
         this.spuMapper = spuMapper;
         this.skuMapper = skuMapper;
         this.objectMapper = objectMapper;
+        this.productCacheService = productCacheService;
     }
 
     public List<CategoryVO> listCategoryTree() {
@@ -146,6 +150,15 @@ public class ProductService implements ProductQueryApi {
     }
 
     public ProductDetailVO getProductDetail(Long spuId) {
+        return productCacheService.getProductDetail(spuId)
+                .orElseGet(() -> {
+                    ProductDetailVO productDetail = loadProductDetail(spuId);
+                    productCacheService.putProductDetail(spuId, productDetail);
+                    return productDetail;
+                });
+    }
+
+    private ProductDetailVO loadProductDetail(Long spuId) {
         ProductSpuEntity spu = requireSellableSpu(spuId);
         ProductCategoryEntity category = requireEnabledCategory(spu.getCategoryId());
         List<SkuVO> skus = skuMapper.selectList(

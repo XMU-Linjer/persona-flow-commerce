@@ -5,6 +5,7 @@ import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.common.vo.PageResult;
 import com.personaflow.commerce.product.api.model.ProductSnapshot;
+import com.personaflow.commerce.product.cache.ProductCacheService;
 import com.personaflow.commerce.product.entity.ProductCategoryEntity;
 import com.personaflow.commerce.product.entity.ProductSkuEntity;
 import com.personaflow.commerce.product.entity.ProductSpuEntity;
@@ -24,10 +25,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,11 +47,14 @@ class ProductServiceTest {
     @Mock
     private ProductSkuMapper skuMapper;
 
+    @Mock
+    private ProductCacheService productCacheService;
+
     private ProductService productService;
 
     @BeforeEach
     void setUp() {
-        productService = new ProductService(categoryMapper, spuMapper, skuMapper, new ObjectMapper());
+        productService = new ProductService(categoryMapper, spuMapper, skuMapper, new ObjectMapper(), productCacheService);
     }
 
     @Test
@@ -95,6 +103,7 @@ class ProductServiceTest {
         spu.setDescription("Mechanical keyboard");
         spu.setDetailImagesJson("[\"detail-1.jpg\",\"detail-2.jpg\"]");
         spu.setAttributesJson("{\"连接方式\":\"蓝牙/2.4G/有线\",\"重量\":\"约 980g\"}");
+        when(productCacheService.getProductDetail(20001L)).thenReturn(Optional.empty());
         when(spuMapper.selectById(20001L)).thenReturn(spu);
         when(categoryMapper.selectById(201L)).thenReturn(category(201L, "键盘鼠标", 2L, 2, 21));
         when(skuMapper.selectList(any())).thenReturn(List.of(
@@ -108,10 +117,24 @@ class ProductServiceTest {
         assertThat(detail.attributes()).containsEntry("重量", "约 980g");
         assertThat(detail.skus()).hasSize(1);
         assertThat(detail.skus().get(0).specs()).containsEntry("轴体", "青轴");
+        verify(productCacheService).putProductDetail(20001L, detail);
+    }
+
+    @Test
+    void getProductDetailReturnsCachedDetailWithoutQueryingDatabase() {
+        ProductDetailVO cachedDetail = productDetailVO(20001L);
+        when(productCacheService.getProductDetail(20001L)).thenReturn(Optional.of(cachedDetail));
+
+        ProductDetailVO detail = productService.getProductDetail(20001L);
+
+        assertThat(detail).isSameAs(cachedDetail);
+        verifyNoInteractions(spuMapper, categoryMapper, skuMapper);
+        verify(productCacheService, never()).putProductDetail(any(), any());
     }
 
     @Test
     void getProductDetailRejectsOffShelfSpu() {
+        when(productCacheService.getProductDetail(20001L)).thenReturn(Optional.empty());
         when(spuMapper.selectById(20001L))
                 .thenReturn(spu(20001L, 201L, "KeyForge K3", "KeyForge", 0, 10));
 
@@ -119,6 +142,7 @@ class ProductServiceTest {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(ErrorCode.CATALOG_PRODUCT_NOT_SELLABLE)
                 );
+        verify(productCacheService, never()).putProductDetail(any(), any());
     }
 
     @Test
@@ -311,6 +335,23 @@ class ProductServiceTest {
         sku.setStatus(1);
         sku.setSalesCount(salesCount);
         return sku;
+    }
+
+    private ProductDetailVO productDetailVO(Long spuId) {
+        return new ProductDetailVO(
+                spuId,
+                201L,
+                "键盘鼠标",
+                "KeyForge K3",
+                "KeyForge K3 subtitle",
+                "KeyForge",
+                "Mechanical keyboard",
+                "main.jpg",
+                List.of("detail-1.jpg"),
+                Map.of("连接方式", "蓝牙"),
+                "办公,演示",
+                List.of()
+        );
     }
 
     private void assertCatalogError(Runnable action, ErrorCode expectedErrorCode) {
