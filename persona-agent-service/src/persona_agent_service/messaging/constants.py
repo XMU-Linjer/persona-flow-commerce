@@ -1,0 +1,49 @@
+AGENT_EXCHANGE = "commerce.agent.exchange"
+AGENT_EXCHANGE_TYPE = "topic"
+
+ROUTING_TASK_ASSIGNED = "agent.task.assigned"
+ROUTING_TASK_ACCEPTED = "agent.task.accepted"
+ROUTING_ARTIFACT_CREATED = "agent.artifact.created"
+ROUTING_CHALLENGE_RAISED = "agent.challenge.raised"
+ROUTING_REVISION_REQUESTED = "agent.revision.requested"
+ROUTING_REVISION_COMPLETED = "agent.revision.completed"
+ROUTING_TASK_COMPLETED = "agent.task.completed"
+ROUTING_TASK_FAILED = "agent.task.failed"
+ROUTING_WORKFLOW_COMPLETED = "agent.workflow.completed"
+ROUTING_DEAD = "agent.dead"
+
+PROFILE_MANAGER_QUEUE = "agent.profile-manager.queue"
+BEHAVIOR_QUEUE = "agent.behavior.queue"
+INTENT_QUEUE = "agent.intent.queue"
+TREND_QUEUE = "agent.trend.queue"
+PROFILE_BUILDER_QUEUE = "agent.profile-builder.queue"
+DEAD_QUEUE = "agent.dead.queue"
+
+AGENT_QUEUE_NAMES = (
+    PROFILE_MANAGER_QUEUE,
+    BEHAVIOR_QUEUE,
+    INTENT_QUEUE,
+    TREND_QUEUE,
+    PROFILE_BUILDER_QUEUE,
+    DEAD_QUEUE,
+)
+
+AGENT_QUEUE_BINDINGS = {
+    PROFILE_MANAGER_QUEUE: (
+        ROUTING_TASK_ACCEPTED,
+        ROUTING_ARTIFACT_CREATED,
+        ROUTING_CHALLENGE_RAISED,
+        ROUTING_REVISION_COMPLETED,
+        ROUTING_TASK_COMPLETED,
+        ROUTING_TASK_FAILED,
+        ROUTING_WORKFLOW_COMPLETED,
+    ),
+    BEHAVIOR_QUEUE: (ROUTING_TASK_ASSIGNED,),
+    INTENT_QUEUE: (ROUTING_TASK_ASSIGNED,),
+    TREND_QUEUE: (ROUTING_TASK_ASSIGNED,),
+    PROFILE_BUILDER_QUEUE: (
+        ROUTING_TASK_ASSIGNED,
+        ROUTING_REVISION_REQUESTED,
+    ),
+    DEAD_QUEUE: (ROUTING_DEAD,),
+}
