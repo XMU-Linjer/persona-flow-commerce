@@ -1,7 +1,7 @@
 package com.personaflow.commerce.behavior.enums;
 
 public enum BehaviorConsumeStatus {
-    PENDING(10),
+    PROCESSING(10),
     SUCCESS(20),
     FAILED(30);
 
