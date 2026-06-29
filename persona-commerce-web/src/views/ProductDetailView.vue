@@ -4,12 +4,17 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Goods, ShoppingCart, Star } from '@element-plus/icons-vue'
 import { getProductDetail, type ProductDetail, type SkuItem } from '@/api/catalog'
+import { addCartItem, addFavorite } from '@/api/shopping'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const loading = ref(false)
+const actionLoading = ref(false)
 const product = ref<ProductDetail | null>(null)
 const selectedSkuId = ref<number>()
+const quantity = ref(1)
 
 const selectedSku = computed(() => {
   return product.value?.skus.find((sku) => sku.skuId === selectedSkuId.value) || product.value?.skus[0]
@@ -52,6 +57,46 @@ async function loadDetail() {
 
 function comingSoon(label: string) {
   ElMessage.info(`${label}将在下一阶段接入`)
+}
+
+function requireLogin() {
+  if (auth.isLoggedIn) {
+    return true
+  }
+
+  ElMessage.warning('请先登录后再操作')
+  router.push({
+    path: '/login',
+    query: { redirect: route.fullPath },
+  })
+  return false
+}
+
+async function favoriteSelectedSku() {
+  if (!selectedSku.value || !requireLogin()) return
+
+  actionLoading.value = true
+  try {
+    await addFavorite(selectedSku.value.skuId)
+    ElMessage.success('已收藏该 SKU')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function addSelectedSkuToCart() {
+  if (!selectedSku.value || !requireLogin()) return
+
+  actionLoading.value = true
+  try {
+    await addCartItem({
+      skuId: selectedSku.value.skuId,
+      quantity: quantity.value,
+    })
+    ElMessage.success('已加入购物车')
+  } finally {
+    actionLoading.value = false
+  }
 }
 
 onMounted(loadDetail)
@@ -118,6 +163,11 @@ watch(() => route.params.spuId, loadDetail)
             <p class="muted">{{ selectedSku ? skuSpecs(selectedSku) : '暂无规格' }}</p>
           </div>
 
+          <div class="section-block">
+            <h2>数量</h2>
+            <el-input-number v-model="quantity" :min="1" :max="99" />
+          </div>
+
           <div v-if="entriesOf(product.attributes).length" class="section-block">
             <h2>商品属性</h2>
             <div class="attribute-grid">
@@ -129,8 +179,10 @@ watch(() => route.params.spuId, loadDetail)
           </div>
 
           <div class="action-row">
-            <el-button :icon="Star" plain @click="comingSoon('收藏')">收藏</el-button>
-            <el-button :icon="ShoppingCart" type="primary" plain @click="comingSoon('加入购物车')">
+            <el-button :icon="Star" :loading="actionLoading" plain @click="favoriteSelectedSku">
+              收藏
+            </el-button>
+            <el-button :icon="ShoppingCart" type="primary" :loading="actionLoading" plain @click="addSelectedSkuToCart">
               加入购物车
             </el-button>
             <el-button :icon="Goods" type="warning" @click="comingSoon('立即购买')">立即购买</el-button>

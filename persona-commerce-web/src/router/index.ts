@@ -35,19 +35,19 @@ const router = createRouter({
     {
       path: '/favorites',
       name: 'favorites',
-      component: () => import('@/views/PlaceholderView.vue'),
+      component: () => import('@/views/FavoriteView.vue'),
       meta: { title: '收藏', requiresAuth: true },
     },
     {
       path: '/cart',
       name: 'cart',
-      component: () => import('@/views/PlaceholderView.vue'),
+      component: () => import('@/views/CartView.vue'),
       meta: { title: '购物车', requiresAuth: true },
     },
     {
       path: '/addresses',
       name: 'addresses',
-      component: () => import('@/views/PlaceholderView.vue'),
+      component: () => import('@/views/AddressView.vue'),
       meta: { title: '地址', requiresAuth: true },
     },
     {
