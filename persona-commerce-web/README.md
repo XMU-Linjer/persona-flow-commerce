@@ -1,48 +1,48 @@
-# persona-commerce-web
+# PersonaFlow Commerce Web
 
-This template should help get you started developing with Vue 3 in Vite.
+V1.0 前端演示项目，基于 Vue 3、Vite、Vue Router、Axios 和 Element Plus。
 
-## Recommended IDE Setup
+## 当前范围
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+已实现：
 
-## Recommended Browser Setup
+- 基础布局、导航和登录状态展示
+- 登录、注册
+- 商品列表、关键词搜索和分页
+- 商品详情、SKU 展示
+- 收藏、购物车、地址、订单占位路由
+- 需要登录页面的路由守卫
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+本阶段暂不实现：
 
-## Type Support for `.vue` Imports in TS
+- 收藏真实功能
+- 购物车真实功能
+- 地址管理
+- 创建订单、订单列表、取消订单、模拟支付
+- admin、behavior、RabbitMQ、Agent
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+## 启动方式
 
-## Customize configuration
+后端默认地址为 `http://localhost:8080`。如需修改，可设置环境变量：
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+```sh
+VITE_API_BASE_URL=http://localhost:8080
+```
 
-## Project Setup
+安装依赖：
 
 ```sh
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+启动开发服务：
 
 ```sh
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+构建：
 
 ```sh
 npm run build
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
 ```

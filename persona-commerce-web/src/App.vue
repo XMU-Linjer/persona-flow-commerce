@@ -1,85 +1,76 @@
-<script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
+﻿<script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  Goods,
+  Location,
+  ShoppingCart,
+  Star,
+  Tickets,
+  User,
+} from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
+
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+
+const activeMenu = computed(() => {
+  if (route.path.startsWith('/products')) return '/products'
+  return route.path
+})
+
+const menuItems = [
+  { path: '/products', label: '首页 / 商品', icon: Goods },
+  { path: '/favorites', label: '收藏', icon: Star },
+  { path: '/cart', label: '购物车', icon: ShoppingCart },
+  { path: '/addresses', label: '地址', icon: Location },
+  { path: '/orders', label: '订单', icon: Tickets },
+]
+
+function logout() {
+  auth.logout()
+  router.push('/login')
+}
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
+  <el-container class="app-shell">
+    <el-header class="app-header">
+      <router-link class="brand" to="/products">
+        <span class="brand-mark">PF</span>
+        <span>
+          <strong>PersonaFlow Commerce</strong>
+          <small>V1.0 Demo</small>
+        </span>
+      </router-link>
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
+      <div class="header-actions">
+        <template v-if="auth.isLoggedIn">
+          <el-icon><User /></el-icon>
+          <span class="user-name">{{ auth.displayName }}</span>
+          <el-button plain size="small" @click="logout">退出登录</el-button>
+        </template>
+        <template v-else>
+          <el-button text @click="router.push('/login')">登录</el-button>
+          <el-button type="primary" @click="router.push('/register')">注册</el-button>
+        </template>
+      </div>
+    </el-header>
 
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
-    </div>
-  </header>
+    <el-container class="body-shell">
+      <el-aside class="sidebar" width="216px">
+        <el-menu :default-active="activeMenu" router>
+          <el-menu-item v-for="item in menuItems" :key="item.path" :index="item.path">
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span>{{ item.label }}</span>
+          </el-menu-item>
+        </el-menu>
+      </el-aside>
 
-  <RouterView />
+      <el-main class="main-content">
+        <router-view />
+      </el-main>
+    </el-container>
+  </el-container>
 </template>
-
-<style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
-}
-
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
-}
-
-nav a.router-link-exact-active {
-  color: var(--color-text);
-}
-
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
-}
-
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
-}
-
-nav a:first-of-type {
-  border: 0;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
-}
-</style>
