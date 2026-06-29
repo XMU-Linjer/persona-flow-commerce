@@ -54,6 +54,11 @@ class BehaviorFact(BaseModel):
 class BehaviorFactReport(ArtifactBase):
     artifact_type: ArtifactType = Field(default=ArtifactType.BEHAVIOR_FACT_REPORT, alias="artifactType")
     facts: list[BehaviorFact] = Field(default_factory=list)
+    recent_keywords: list[str] = Field(default_factory=list, alias="recentKeywords")
+    event_type_counts: dict[str, int] = Field(default_factory=dict, alias="eventTypeCounts")
+    top_categories: list[dict[str, Any]] = Field(default_factory=list, alias="topCategories")
+    paid_signals: list[dict[str, Any]] = Field(default_factory=list, alias="paidSignals")
+    fulfilled_needs: list[dict[str, Any]] = Field(default_factory=list, alias="fulfilledNeeds")
 
 
 class FulfilledNeed(BaseModel):
@@ -116,6 +121,11 @@ class TrendReport(ArtifactBase):
     rising: list[TrendSignal] = Field(default_factory=list)
     declining: list[TrendSignal] = Field(default_factory=list)
     noise: list[TrendSignal] = Field(default_factory=list)
+    stable_interests: list[TrendSignal] = Field(default_factory=list, alias="stableInterests")
+    rising_interests: list[TrendSignal] = Field(default_factory=list, alias="risingInterests")
+    declining_interests: list[TrendSignal] = Field(default_factory=list, alias="decliningInterests")
+    burst_intent: list[TrendSignal] = Field(default_factory=list, alias="burstIntent")
+    noise_events: list[TrendSignal] = Field(default_factory=list, alias="noiseEvents")
 
 
 class ProfileDraft(ArtifactBase):
@@ -128,6 +138,10 @@ class ProfileDraft(ArtifactBase):
         default_factory=list,
         alias="complementOpportunities",
     )
+    demand_states: list[DemandState] = Field(default_factory=list, alias="demandStates")
+    preferred_categories: list[str] = Field(default_factory=list, alias="preferredCategories")
+    do_not_recommend: list[dict[str, Any]] = Field(default_factory=list, alias="doNotRecommend")
+    audit_result: str | None = Field(default=None, alias="auditResult")
 
 
 class ProfileAuditReport(ArtifactBase):

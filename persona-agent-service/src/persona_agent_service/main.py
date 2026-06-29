@@ -2,7 +2,10 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from persona_agent_service.agents.mock_workflow import build_mock_profile_workflow
+from persona_agent_service.agents.profile_manager import ProfileManager
 from persona_agent_service.messaging.publisher import AgentBusPublisher
+from persona_agent_service.schemas.context import AgentProfileContext
+from persona_agent_service.schemas.profile import ProfileBuildResult
 
 
 class MockWorkflowRequest(BaseModel):
@@ -48,3 +51,8 @@ def create_mock_profile_workflow(request: MockWorkflowRequest) -> dict[str, obje
         "messageIds": [message.message_id for message in messages],
         "routingKeys": routing_keys,
     }
+
+
+@app.post("/agent/profile/build", response_model=ProfileBuildResult)
+def build_profile(context: AgentProfileContext) -> ProfileBuildResult:
+    return ProfileManager().build_profile(context)
