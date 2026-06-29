@@ -7,6 +7,7 @@ import { listAddresses, type AddressItem } from '@/api/address'
 import { createOrder } from '@/api/trade'
 import { clearCheckoutItems, loadCheckoutItems, type CheckoutItem } from '@/utils/checkout'
 import { formatMoney } from '@/utils/order'
+import ProductImage from '@/components/ProductImage.vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -124,11 +125,7 @@ onMounted(loadPage)
 
             <div class="checkout-items">
               <article v-for="item in checkoutItems" :key="item.skuId" class="checkout-item">
-                <el-image class="item-thumb" fit="cover" :src="item.imageUrl">
-                  <template #error>
-                    <div class="thumb-fallback">{{ item.categoryName }}</div>
-                  </template>
-                </el-image>
+                <ProductImage class="item-thumb" :src="item.imageUrl" :label="item.categoryName" />
                 <div class="item-info">
                   <strong>{{ item.productName }}</strong>
                   <span>{{ item.skuName }}</span>
@@ -249,19 +246,10 @@ onMounted(loadPage)
   border-bottom: none;
 }
 
-.item-thumb,
-.thumb-fallback {
+.item-thumb {
   width: 72px;
   height: 72px;
   border-radius: 6px;
-}
-
-.thumb-fallback {
-  display: grid;
-  place-items: center;
-  background: #edf3f0;
-  color: #53606f;
-  font-size: 12px;
 }
 
 .item-info strong,

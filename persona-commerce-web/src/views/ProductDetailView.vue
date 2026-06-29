@@ -7,6 +7,7 @@ import { getProductDetail, type ProductDetail, type SkuItem } from '@/api/catalo
 import { addCartItem, addFavorite } from '@/api/shopping'
 import { useAuthStore } from '@/stores/auth'
 import { saveCheckoutItems } from '@/utils/checkout'
+import ProductImage from '@/components/ProductImage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -140,14 +141,20 @@ watch(() => route.params.spuId, loadDetail)
 
       <div v-else class="detail-layout">
         <div class="media-panel content-panel">
-          <el-image class="detail-image" fit="cover" :src="product.mainImageUrl">
-            <template #error>
-              <div class="detail-fallback">{{ product.brand || product.categoryName }}</div>
-            </template>
-          </el-image>
+          <ProductImage
+            class="detail-image"
+            :src="product.mainImageUrl"
+            :label="product.brand || product.categoryName"
+          />
 
           <div v-if="gallery.length > 1" class="thumb-row">
-            <el-image v-for="image in gallery" :key="image" class="thumb" fit="cover" :src="image" />
+            <ProductImage
+              v-for="image in gallery"
+              :key="image"
+              class="thumb"
+              :src="image"
+              :label="product.brand || product.categoryName"
+            />
           </div>
         </div>
 
@@ -223,20 +230,10 @@ watch(() => route.params.spuId, loadDetail)
   padding: 18px;
 }
 
-.detail-image,
-.detail-fallback {
+.detail-image {
   width: 100%;
   height: 430px;
   border-radius: 8px;
-}
-
-.detail-fallback {
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, #dfeee7, #f3e1c9);
-  color: #53606f;
-  font-size: 22px;
-  font-weight: 700;
 }
 
 .thumb-row {
@@ -341,8 +338,7 @@ watch(() => route.params.spuId, loadDetail)
     grid-template-columns: 1fr;
   }
 
-  .detail-image,
-  .detail-fallback {
+  .detail-image {
     height: 320px;
   }
 }

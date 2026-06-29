@@ -11,6 +11,7 @@ import {
   type CartItem,
 } from '@/api/shopping'
 import { saveCheckoutItems } from '@/utils/checkout'
+import ProductImage from '@/components/ProductImage.vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -110,11 +111,7 @@ onMounted(loadCart)
         <el-table-column label="商品" min-width="360">
           <template #default="{ row }: { row: CartItem }">
             <div class="product-cell">
-              <el-image class="product-thumb" fit="cover" :src="row.imageUrl">
-                <template #error>
-                  <div class="thumb-fallback">{{ row.categoryName }}</div>
-                </template>
-              </el-image>
+              <ProductImage class="product-thumb" :src="row.imageUrl" :label="row.categoryName" />
               <div>
                 <strong>{{ row.productName }}</strong>
                 <span>{{ row.skuName }}</span>
@@ -179,19 +176,10 @@ onMounted(loadCart)
   gap: 12px;
 }
 
-.product-thumb,
-.thumb-fallback {
+.product-thumb {
   width: 72px;
   height: 72px;
   border-radius: 6px;
-}
-
-.thumb-fallback {
-  display: grid;
-  place-items: center;
-  background: #edf3f0;
-  color: #53606f;
-  font-size: 12px;
 }
 
 .product-cell strong,

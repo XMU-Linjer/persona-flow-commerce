@@ -11,6 +11,7 @@ import {
   orderStatusLabel,
   orderStatusTagType,
 } from '@/utils/order'
+import ProductImage from '@/components/ProductImage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -142,11 +143,7 @@ onMounted(loadOrder)
 
           <div class="order-items">
             <article v-for="item in order.items" :key="item.skuId" class="order-item">
-              <el-image class="item-thumb" fit="cover" :src="item.imageUrl">
-                <template #error>
-                  <div class="thumb-fallback">{{ item.categoryName }}</div>
-                </template>
-              </el-image>
+              <ProductImage class="item-thumb" :src="item.imageUrl" :label="item.categoryName" />
               <div class="item-info">
                 <strong>{{ item.productName }}</strong>
                 <span>{{ item.skuName }}</span>
@@ -231,19 +228,10 @@ onMounted(loadOrder)
   border-bottom: none;
 }
 
-.item-thumb,
-.thumb-fallback {
+.item-thumb {
   width: 72px;
   height: 72px;
   border-radius: 6px;
-}
-
-.thumb-fallback {
-  display: grid;
-  place-items: center;
-  background: #edf3f0;
-  color: #53606f;
-  font-size: 12px;
 }
 
 .item-info strong,

@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
 import { listProducts, type ProductListItem } from '@/api/catalog'
+import ProductImage from '@/components/ProductImage.vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -96,11 +97,11 @@ onMounted(loadProducts)
           class="product-card"
           @click="openDetail(product)"
         >
-          <el-image class="product-image" fit="cover" :src="product.mainImageUrl">
-            <template #error>
-              <div class="image-fallback">{{ product.brand || product.categoryName || '商品' }}</div>
-            </template>
-          </el-image>
+          <ProductImage
+            class="product-image"
+            :src="product.mainImageUrl"
+            :label="product.brand || product.categoryName"
+          />
 
           <div class="product-info">
             <div class="product-meta">
@@ -175,18 +176,9 @@ onMounted(loadProducts)
   box-shadow: 0 16px 34px rgba(31, 42, 55, 0.1);
 }
 
-.product-image,
-.image-fallback {
+.product-image {
   width: 100%;
   height: 180px;
-}
-
-.image-fallback {
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, #dfeee7, #f3e1c9);
-  color: #53606f;
-  font-weight: 700;
 }
 
 .product-info {
