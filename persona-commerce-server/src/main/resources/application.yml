@@ -1,24 +1,29 @@
 spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
   application:
     name: persona-commerce-server
 
   datasource:
-    url: jdbc:mysql://localhost:3306/${MYSQL_DATABASE}
-    username: ${MYSQL_USER}
-    password: ${MYSQL_PASSWORD}
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:persona_flow_commerce}
+    username: ${MYSQL_USER:persona_flow}
+    password: ${MYSQL_PASSWORD:123456}
 
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
       database: 0
       timeout: 2s
 
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: ${RABBITMQ_DEFAULT_USER}
-    password: ${RABBITMQ_DEFAULT_PASS}
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:${RABBITMQ_DEFAULT_USER:persona_flow}}
+    password: ${RABBITMQ_PASSWORD:${RABBITMQ_DEFAULT_PASS:123456}}
 
 commerce:
   jwt:

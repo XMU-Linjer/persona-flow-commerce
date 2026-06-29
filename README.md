@@ -1,5 +1,32 @@
 # PersonaFlow Commerce
 
+## Local Startup
+
+Spring Boot imports the project root `.env` automatically during local startup. Developers do not need to set `$env:MYSQL_USER`, `$env:MYSQL_PASSWORD`, or the matching Redis/RabbitMQ variables manually in PowerShell.
+
+```powershell
+cd D:\Workspace\persona-flow-commerce
+docker compose up -d
+
+cd persona-commerce-server
+.\mvnw.cmd spring-boot:run
+```
+
+Health check:
+
+```powershell
+curl.exe http://127.0.0.1:8080/actuator/health
+```
+
+Frontend dev server:
+
+```powershell
+cd D:\Workspace\persona-flow-commerce\persona-commerce-web
+npm.cmd run dev -- --host 127.0.0.1
+```
+
+If PowerShell blocks `npm.ps1`, use `npm.cmd`.
+
 PersonaFlow Commerce 是一个基于 Spring Boot 的模块化单体电商后端项目。
 
 当前状态：V1.0 后端核心链路已完成 account、catalog、shopping、trade 四个模块；behavior、RabbitMQ 行为事件、admin 管理端和 Agent 推荐仍属于后续阶段。
