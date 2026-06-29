@@ -6,6 +6,7 @@ import { ArrowLeft, Goods, ShoppingCart, Star } from '@element-plus/icons-vue'
 import { getProductDetail, type ProductDetail, type SkuItem } from '@/api/catalog'
 import { addCartItem, addFavorite } from '@/api/shopping'
 import { useAuthStore } from '@/stores/auth'
+import { saveCheckoutItems } from '@/utils/checkout'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,10 +56,6 @@ async function loadDetail() {
   }
 }
 
-function comingSoon(label: string) {
-  ElMessage.info(`${label}将在下一阶段接入`)
-}
-
 function requireLogin() {
   if (auth.isLoggedIn) {
     return true
@@ -97,6 +94,26 @@ async function addSelectedSkuToCart() {
   } finally {
     actionLoading.value = false
   }
+}
+
+function buyNow() {
+  if (!product.value || !selectedSku.value || !requireLogin()) return
+
+  saveCheckoutItems([
+    {
+      skuId: selectedSku.value.skuId,
+      spuId: product.value.spuId,
+      categoryId: product.value.categoryId,
+      categoryName: product.value.categoryName,
+      productName: product.value.name,
+      skuName: selectedSku.value.skuName,
+      imageUrl: selectedSku.value.imageUrl || product.value.mainImageUrl,
+      unitPrice: Number(selectedSku.value.price || 0),
+      quantity: quantity.value,
+      subtotal: Number(selectedSku.value.price || 0) * quantity.value,
+    },
+  ])
+  router.push('/checkout')
 }
 
 onMounted(loadDetail)
@@ -185,7 +202,7 @@ watch(() => route.params.spuId, loadDetail)
             <el-button :icon="ShoppingCart" type="primary" :loading="actionLoading" plain @click="addSelectedSkuToCart">
               加入购物车
             </el-button>
-            <el-button :icon="Goods" type="warning" @click="comingSoon('立即购买')">立即购买</el-button>
+            <el-button :icon="Goods" type="warning" @click="buyNow">立即购买</el-button>
           </div>
         </div>
       </div>

@@ -1,54 +1,57 @@
 # PersonaFlow Commerce Web
 
-V1.0 前端演示项目，基于 Vue 3、Vite、Vue Router、Axios 和 Element Plus。
+V1.0 frontend demo built with Vue 3, Vite, Vue Router, Axios, TypeScript, Pinia, and Element Plus.
 
-## 当前范围
+## Current Scope
 
-已实现：
+Implemented:
 
-- 基础布局、导航和登录状态展示
-- 登录、注册
-- 商品列表、关键词搜索和分页
-- 商品详情、SKU 选择、收藏 SKU、加入购物车
-- 收藏列表、取消收藏、跳转商品详情
-- 购物车列表、修改数量、删除单项、清空购物车、总金额展示
-- 地址列表、新增、编辑、删除、设为默认地址
-- 需要登录页面的路由守卫
+- Base layout, navigation, login state, and logout
+- Login and registration
+- Product list, keyword search, pagination, and product detail
+- SKU selection, add favorite, add cart item, and buy now
+- Favorite list and remove favorite
+- Cart list, quantity update, item delete, clear cart, and checkout entry
+- Address list, create, edit, delete, and set default
+- Checkout page and order creation
+- Order list, status filter, order detail, cancel order, and mock payment
+- Auth-required route guards
 
-本阶段暂不实现：
+Not implemented in V1.0 frontend:
 
-- 创建订单
-- 订单列表、订单详情
-- 取消订单、模拟支付
-- admin、behavior、RabbitMQ、Agent、RAG
+- Real third-party payment
+- Refund, logistics, coupon, merchant system
+- behavior, RabbitMQ, Agent, admin, RAG
 
-## 启动方式
+## API Base URL
 
-后端默认地址为 `http://localhost:8080`。如需修改，可设置环境变量：
+The backend defaults to `http://localhost:8080`.
+
+Set `VITE_API_BASE_URL` if needed:
 
 ```sh
 VITE_API_BASE_URL=http://localhost:8080
 ```
 
-安装依赖：
+## Project Setup
 
 ```sh
 npm install
 ```
 
-启动开发服务：
+## Development
 
 ```sh
 npm run dev
 ```
 
-如果 PowerShell 拦截 `npm.ps1`，可以使用：
+If PowerShell blocks `npm.ps1`, use:
 
 ```sh
 npm.cmd run dev -- --host 127.0.0.1
 ```
 
-构建：
+## Build
 
 ```sh
 npm.cmd run build

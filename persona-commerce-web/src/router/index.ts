@@ -51,10 +51,22 @@ const router = createRouter({
       meta: { title: '地址', requiresAuth: true },
     },
     {
+      path: '/checkout',
+      name: 'checkout',
+      component: () => import('@/views/CheckoutView.vue'),
+      meta: { title: '确认订单', requiresAuth: true },
+    },
+    {
       path: '/orders',
       name: 'orders',
-      component: () => import('@/views/PlaceholderView.vue'),
+      component: () => import('@/views/OrderListView.vue'),
       meta: { title: '订单', requiresAuth: true },
+    },
+    {
+      path: '/orders/:orderId',
+      name: 'order-detail',
+      component: () => import('@/views/OrderDetailView.vue'),
+      meta: { title: '订单详情', requiresAuth: true },
     },
   ],
 })

@@ -10,6 +10,7 @@ import {
   updateCartItem,
   type CartItem,
 } from '@/api/shopping'
+import { saveCheckoutItems } from '@/utils/checkout'
 
 const router = useRouter()
 const loading = ref(false)
@@ -69,8 +70,24 @@ function openProduct(item: CartItem) {
   router.push(`/products/${item.spuId}`)
 }
 
-function checkoutLater() {
-  ElMessage.info('订单功能将在下一阶段接入')
+function goCheckout() {
+  if (cartItems.value.length === 0) return
+
+  saveCheckoutItems(
+    cartItems.value.map((item) => ({
+      skuId: item.skuId,
+      spuId: item.spuId,
+      categoryId: item.categoryId,
+      categoryName: item.categoryName,
+      productName: item.productName,
+      skuName: item.skuName,
+      imageUrl: item.imageUrl,
+      unitPrice: Number(item.unitPrice || 0),
+      quantity: item.quantity,
+      subtotal: Number(item.subtotal || 0),
+    })),
+  )
+  router.push('/checkout')
 }
 
 onMounted(loadCart)
@@ -143,7 +160,7 @@ onMounted(loadCart)
       <div class="cart-summary">
         <span>合计</span>
         <strong>{{ formatMoney(totalAmount) }}</strong>
-        <el-button type="primary" :disabled="cartItems.length === 0" @click="checkoutLater">
+        <el-button type="primary" :disabled="cartItems.length === 0" @click="goCheckout">
           去下单
         </el-button>
       </div>
