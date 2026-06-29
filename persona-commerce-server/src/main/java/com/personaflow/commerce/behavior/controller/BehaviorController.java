@@ -2,6 +2,7 @@ package com.personaflow.commerce.behavior.controller;
 
 import com.personaflow.commerce.behavior.enums.BehaviorEventType;
 import com.personaflow.commerce.behavior.service.BehaviorContextService;
+import com.personaflow.commerce.behavior.service.BehaviorProfileRefreshService;
 import com.personaflow.commerce.behavior.service.BehaviorQueryService;
 import com.personaflow.commerce.behavior.service.BehaviorSummaryService;
 import com.personaflow.commerce.behavior.service.UserProfileVersionService;
@@ -14,6 +15,7 @@ import com.personaflow.commerce.user.api.CurrentUserProvider;
 import jakarta.validation.constraints.Min;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,19 +32,22 @@ public class BehaviorController {
     private final BehaviorSummaryService behaviorSummaryService;
     private final BehaviorContextService behaviorContextService;
     private final UserProfileVersionService userProfileVersionService;
+    private final BehaviorProfileRefreshService behaviorProfileRefreshService;
 
     public BehaviorController(
             CurrentUserProvider currentUserProvider,
             BehaviorQueryService behaviorQueryService,
             BehaviorSummaryService behaviorSummaryService,
             BehaviorContextService behaviorContextService,
-            UserProfileVersionService userProfileVersionService
+            UserProfileVersionService userProfileVersionService,
+            BehaviorProfileRefreshService behaviorProfileRefreshService
     ) {
         this.currentUserProvider = currentUserProvider;
         this.behaviorQueryService = behaviorQueryService;
         this.behaviorSummaryService = behaviorSummaryService;
         this.behaviorContextService = behaviorContextService;
         this.userProfileVersionService = userProfileVersionService;
+        this.behaviorProfileRefreshService = behaviorProfileRefreshService;
     }
 
     @GetMapping("/events")
@@ -74,5 +79,12 @@ public class BehaviorController {
     public ApiResponse<UserProfileLatestVO> getLatestProfile() {
         Long userId = currentUserProvider.requireCurrentUser().userId();
         return ApiResponse.success(UserProfileLatestVO.from(userId, userProfileVersionService.findLatestProfile(userId)));
+    }
+
+    @PostMapping("/profile/refresh")
+    public ApiResponse<UserProfileLatestVO> refreshProfile(
+            @Min(1) @RequestParam(defaultValue = "30") Integer days
+    ) {
+        return ApiResponse.success(behaviorProfileRefreshService.refreshCurrentUserProfile(days));
     }
 }

@@ -34,7 +34,10 @@ public enum ErrorCode {
     TRADE_STOCK_NOT_FOUND("TRADE_STOCK_NOT_FOUND", HttpStatus.NOT_FOUND, "Stock was not found"),
     TRADE_STOCK_NOT_ENOUGH("TRADE_STOCK_NOT_ENOUGH", HttpStatus.CONFLICT, "Stock is not enough"),
     TRADE_STOCK_STATE_INVALID("TRADE_STOCK_STATE_INVALID", HttpStatus.CONFLICT, "Stock state is invalid"),
-    TRADE_PAYMENT_RECORD_EXISTS("TRADE_PAYMENT_RECORD_EXISTS", HttpStatus.CONFLICT, "Payment record already exists");
+    TRADE_PAYMENT_RECORD_EXISTS("TRADE_PAYMENT_RECORD_EXISTS", HttpStatus.CONFLICT, "Payment record already exists"),
+
+    AGENT_SERVICE_UNAVAILABLE("AGENT_SERVICE_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE, "Agent service is unavailable"),
+    AGENT_PROFILE_BUILD_FAILED("AGENT_PROFILE_BUILD_FAILED", HttpStatus.BAD_GATEWAY, "Agent profile build failed");
 
     private final String code;
     private final HttpStatus httpStatus;

@@ -6,12 +6,14 @@ import com.personaflow.commerce.auth.security.JwtService;
 import com.personaflow.commerce.auth.security.SecurityConfig;
 import com.personaflow.commerce.behavior.enums.BehaviorEventType;
 import com.personaflow.commerce.behavior.service.BehaviorContextService;
+import com.personaflow.commerce.behavior.service.BehaviorProfileRefreshService;
 import com.personaflow.commerce.behavior.service.BehaviorQueryService;
 import com.personaflow.commerce.behavior.service.BehaviorSummaryService;
 import com.personaflow.commerce.behavior.service.UserProfileVersionService;
 import com.personaflow.commerce.behavior.vo.AgentProfileContext;
 import com.personaflow.commerce.behavior.vo.BehaviorEventVO;
 import com.personaflow.commerce.behavior.vo.BehaviorSummaryVO;
+import com.personaflow.commerce.behavior.vo.UserProfileLatestVO;
 import com.personaflow.commerce.common.error.GlobalExceptionHandler;
 import com.personaflow.commerce.common.error.RestAccessDeniedHandler;
 import com.personaflow.commerce.common.error.RestAuthenticationEntryPoint;
@@ -43,6 +45,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -84,6 +87,9 @@ class BehaviorControllerTest {
     @Autowired
     private UserProfileVersionService userProfileVersionService;
 
+    @Autowired
+    private BehaviorProfileRefreshService behaviorProfileRefreshService;
+
     @BeforeEach
     void setUp() {
         reset(
@@ -91,7 +97,8 @@ class BehaviorControllerTest {
                 behaviorQueryService,
                 behaviorSummaryService,
                 behaviorContextService,
-                userProfileVersionService
+                userProfileVersionService,
+                behaviorProfileRefreshService
         );
     }
 
@@ -178,6 +185,22 @@ class BehaviorControllerTest {
     }
 
     @Test
+    void authenticatedUserCanRefreshProfile() throws Exception {
+        when(behaviorProfileRefreshService.refreshCurrentUserProfile(30)).thenReturn(profileLatestVO());
+
+        mockMvc.perform(post("/api/behavior/me/profile/refresh")
+                        .header("Authorization", bearerToken())
+                        .param("days", "30"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.userId").value(10001))
+                .andExpect(jsonPath("$.data.exists").value(true))
+                .andExpect(jsonPath("$.data.sourceWorkflowId").value("workflow-001"));
+
+        verify(behaviorProfileRefreshService).refreshCurrentUserProfile(30);
+    }
+
+    @Test
     void anonymousUserCannotAccessBehaviorEndpoints() throws Exception {
         mockMvc.perform(get("/api/behavior/me/events"))
                 .andExpect(status().isUnauthorized())
@@ -195,12 +218,17 @@ class BehaviorControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNAUTHORIZED"));
 
+        mockMvc.perform(post("/api/behavior/me/profile/refresh"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_UNAUTHORIZED"));
+
         verifyNoInteractions(
                 currentUserProvider,
                 behaviorQueryService,
                 behaviorSummaryService,
                 behaviorContextService,
-                userProfileVersionService
+                userProfileVersionService,
+                behaviorProfileRefreshService
         );
     }
 
@@ -276,6 +304,19 @@ class BehaviorControllerTest {
         );
     }
 
+    private UserProfileLatestVO profileLatestVO() {
+        return new UserProfileLatestVO(
+                10001L,
+                true,
+                1L,
+                1782748800,
+                "{\"summary\":\"profile\"}",
+                "profile",
+                "workflow-001",
+                LocalDateTime.of(2026, 6, 29, 12, 0)
+        );
+    }
+
     @TestConfiguration
     static class TestConfig {
 
@@ -302,6 +343,11 @@ class BehaviorControllerTest {
         @Bean
         UserProfileVersionService userProfileVersionService() {
             return mock(UserProfileVersionService.class);
+        }
+
+        @Bean
+        BehaviorProfileRefreshService behaviorProfileRefreshService() {
+            return mock(BehaviorProfileRefreshService.class);
         }
 
         @Bean
