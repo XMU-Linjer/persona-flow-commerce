@@ -2,6 +2,9 @@ package com.personaflow.commerce.order.service;
 
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
+import com.personaflow.commerce.behavior.enums.BehaviorEventType;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishCommand;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.inventory.service.InventoryService;
 import com.personaflow.commerce.order.dto.CreateOrderItemRequest;
 import com.personaflow.commerce.order.dto.CreateOrderRequest;
@@ -67,6 +70,9 @@ class OrderServiceCreateTest {
     @Mock
     private OrderNoGenerator orderNoGenerator;
 
+    @Mock
+    private BehaviorEventPublishSupport behaviorEventPublishSupport;
+
     private OrderService orderService;
 
     @BeforeEach
@@ -79,7 +85,8 @@ class OrderServiceCreateTest {
                 addressQueryApi,
                 productQueryApi,
                 inventoryService,
-                orderNoGenerator
+                orderNoGenerator,
+                behaviorEventPublishSupport
         );
     }
 
@@ -149,6 +156,17 @@ class OrderServiceCreateTest {
         assertThat(firstItem.getUnitPrice()).isEqualByComparingTo("459.00");
         assertThat(firstItem.getQuantity()).isEqualTo(2);
         assertThat(firstItem.getSubtotal()).isEqualByComparingTo("918.00");
+
+        ArgumentCaptor<BehaviorEventPublishCommand> commandCaptor =
+                ArgumentCaptor.forClass(BehaviorEventPublishCommand.class);
+        verify(behaviorEventPublishSupport).publishAfterCommit(commandCaptor.capture());
+        BehaviorEventPublishCommand command = commandCaptor.getValue();
+        assertThat(command.eventType()).isEqualTo(BehaviorEventType.ORDER_CREATED);
+        assertThat(command.userId()).isEqualTo(10001L);
+        assertThat(command.sourceModule()).isEqualTo("trade");
+        assertThat(command.objectType()).isEqualTo("ORDER");
+        assertThat(command.orderId()).isEqualTo(50001L);
+        assertThat(command.amount()).isEqualByComparingTo("1047.00");
     }
 
     @Test
@@ -162,6 +180,7 @@ class OrderServiceCreateTest {
         verifyNoInteractions(addressQueryApi, productQueryApi, inventoryService);
         verify(tradeOrderMapper, never()).insert(any(TradeOrderEntity.class));
         verify(tradeOrderItemMapper, never()).insert(any(TradeOrderItemEntity.class));
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -178,6 +197,7 @@ class OrderServiceCreateTest {
         verifyNoInteractions(addressQueryApi, productQueryApi, inventoryService);
         verify(tradeOrderMapper, never()).insert(any(TradeOrderEntity.class));
         verify(tradeOrderItemMapper, never()).insert(any(TradeOrderItemEntity.class));
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -197,6 +217,7 @@ class OrderServiceCreateTest {
         verifyNoInteractions(addressQueryApi, productQueryApi, inventoryService);
         verify(tradeOrderMapper, never()).insert(any(TradeOrderEntity.class));
         verify(tradeOrderItemMapper, never()).insert(any(TradeOrderItemEntity.class));
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -213,6 +234,7 @@ class OrderServiceCreateTest {
         verifyNoInteractions(inventoryService);
         verify(tradeOrderMapper, never()).insert(any(TradeOrderEntity.class));
         verify(tradeOrderItemMapper, never()).insert(any(TradeOrderItemEntity.class));
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -230,6 +252,7 @@ class OrderServiceCreateTest {
         );
         verify(tradeOrderMapper, never()).insert(any(TradeOrderEntity.class));
         verify(tradeOrderItemMapper, never()).insert(any(TradeOrderItemEntity.class));
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     private CreateOrderRequest request() {

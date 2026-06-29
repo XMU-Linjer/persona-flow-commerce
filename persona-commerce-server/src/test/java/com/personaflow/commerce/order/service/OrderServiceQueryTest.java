@@ -1,5 +1,6 @@
 package com.personaflow.commerce.order.service;
 
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.common.vo.PageResult;
@@ -63,6 +64,9 @@ class OrderServiceQueryTest {
     @Mock
     private OrderNoGenerator orderNoGenerator;
 
+    @Mock
+    private BehaviorEventPublishSupport behaviorEventPublishSupport;
+
     private OrderService orderService;
 
     @BeforeEach
@@ -75,7 +79,8 @@ class OrderServiceQueryTest {
                 addressQueryApi,
                 productQueryApi,
                 inventoryService,
-                orderNoGenerator
+                orderNoGenerator,
+                behaviorEventPublishSupport
         );
     }
 

@@ -1,5 +1,8 @@
 package com.personaflow.commerce.order.service;
 
+import com.personaflow.commerce.behavior.enums.BehaviorEventType;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishCommand;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.inventory.service.InventoryService;
@@ -17,6 +20,7 @@ import com.personaflow.commerce.user.api.model.CurrentUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -62,6 +66,9 @@ class OrderServiceCancelTest {
     @Mock
     private OrderNoGenerator orderNoGenerator;
 
+    @Mock
+    private BehaviorEventPublishSupport behaviorEventPublishSupport;
+
     private OrderService orderService;
 
     @BeforeEach
@@ -74,7 +81,8 @@ class OrderServiceCancelTest {
                 addressQueryApi,
                 productQueryApi,
                 inventoryService,
-                orderNoGenerator
+                orderNoGenerator,
+                behaviorEventPublishSupport
         );
     }
 
@@ -103,6 +111,17 @@ class OrderServiceCancelTest {
         verify(inventoryService).releaseLockedStock(30001L, 2);
         verify(inventoryService).releaseLockedStock(30002L, 1);
         verifyNoInteractions(addressQueryApi, productQueryApi, paymentRecordMapper);
+
+        ArgumentCaptor<BehaviorEventPublishCommand> commandCaptor =
+                ArgumentCaptor.forClass(BehaviorEventPublishCommand.class);
+        verify(behaviorEventPublishSupport).publishAfterCommit(commandCaptor.capture());
+        BehaviorEventPublishCommand command = commandCaptor.getValue();
+        assertThat(command.eventType()).isEqualTo(BehaviorEventType.ORDER_CANCELED);
+        assertThat(command.userId()).isEqualTo(10001L);
+        assertThat(command.sourceModule()).isEqualTo("trade");
+        assertThat(command.objectType()).isEqualTo("ORDER");
+        assertThat(command.orderId()).isEqualTo(50001L);
+        assertThat(command.amount()).isEqualByComparingTo("918.00");
     }
 
     @Test
@@ -117,6 +136,7 @@ class OrderServiceCancelTest {
         verify(tradeOrderItemMapper, never()).selectList(any());
         verify(tradeOrderMapper, never()).cancelPendingOrder(any(), any(), any(), any(), any());
         verifyNoInteractions(inventoryService, addressQueryApi, productQueryApi, paymentRecordMapper);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -129,6 +149,7 @@ class OrderServiceCancelTest {
                 ErrorCode.TRADE_ORDER_NOT_FOUND
         );
         verifyNoInteractions(inventoryService, addressQueryApi, productQueryApi, paymentRecordMapper);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -143,6 +164,7 @@ class OrderServiceCancelTest {
         verify(tradeOrderItemMapper, never()).selectList(any());
         verify(tradeOrderMapper, never()).cancelPendingOrder(any(), any(), any(), any(), any());
         verifyNoInteractions(inventoryService, addressQueryApi, productQueryApi, paymentRecordMapper);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -157,6 +179,7 @@ class OrderServiceCancelTest {
         verify(tradeOrderItemMapper, never()).selectList(any());
         verify(tradeOrderMapper, never()).cancelPendingOrder(any(), any(), any(), any(), any());
         verifyNoInteractions(inventoryService, addressQueryApi, productQueryApi, paymentRecordMapper);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -177,6 +200,7 @@ class OrderServiceCancelTest {
                 ErrorCode.TRADE_ORDER_STATUS_NOT_ALLOWED
         );
         verifyNoInteractions(inventoryService, addressQueryApi, productQueryApi, paymentRecordMapper);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -201,6 +225,7 @@ class OrderServiceCancelTest {
         );
         verify(inventoryService).releaseLockedStock(30001L, 2);
         verifyNoInteractions(addressQueryApi, productQueryApi, paymentRecordMapper);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     private CurrentUser currentUser() {

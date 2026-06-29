@@ -1,5 +1,8 @@
 package com.personaflow.commerce.payment.service;
 
+import com.personaflow.commerce.behavior.enums.BehaviorEventType;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishCommand;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.inventory.service.InventoryService;
@@ -59,6 +62,9 @@ class PaymentServiceTest {
     @Mock
     private PaymentNoGenerator paymentNoGenerator;
 
+    @Mock
+    private BehaviorEventPublishSupport behaviorEventPublishSupport;
+
     private PaymentService paymentService;
 
     @BeforeEach
@@ -69,7 +75,8 @@ class PaymentServiceTest {
                 paymentRecordMapper,
                 currentUserProvider,
                 inventoryService,
-                paymentNoGenerator
+                paymentNoGenerator,
+                behaviorEventPublishSupport
         );
     }
 
@@ -128,6 +135,17 @@ class PaymentServiceTest {
         assertThat(paymentRecord.getPaidAt()).isNotNull();
         assertThat(paymentRecord.getCreatedAt()).isEqualTo(paymentRecord.getPaidAt());
         assertThat(paymentRecord.getUpdatedAt()).isEqualTo(paymentRecord.getPaidAt());
+
+        ArgumentCaptor<BehaviorEventPublishCommand> commandCaptor =
+                ArgumentCaptor.forClass(BehaviorEventPublishCommand.class);
+        verify(behaviorEventPublishSupport).publishAfterCommit(commandCaptor.capture());
+        BehaviorEventPublishCommand command = commandCaptor.getValue();
+        assertThat(command.eventType()).isEqualTo(BehaviorEventType.PAYMENT_SUCCESS);
+        assertThat(command.userId()).isEqualTo(10001L);
+        assertThat(command.sourceModule()).isEqualTo("trade");
+        assertThat(command.objectType()).isEqualTo("ORDER");
+        assertThat(command.orderId()).isEqualTo(50001L);
+        assertThat(command.amount()).isEqualByComparingTo("918.00");
     }
 
     @Test
@@ -154,6 +172,7 @@ class PaymentServiceTest {
                 ErrorCode.COMMON_BAD_REQUEST
         );
         verifyNoInteractions(currentUserProvider, tradeOrderMapper, tradeOrderItemMapper, paymentRecordMapper, inventoryService);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -168,6 +187,7 @@ class PaymentServiceTest {
         verify(tradeOrderItemMapper, never()).selectList(any());
         verify(tradeOrderMapper, never()).markOrderPaid(any(), any(), any(), any(), any());
         verifyNoInteractions(paymentRecordMapper, inventoryService, paymentNoGenerator);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -180,6 +200,7 @@ class PaymentServiceTest {
                 ErrorCode.TRADE_ORDER_NOT_FOUND
         );
         verifyNoInteractions(paymentRecordMapper, inventoryService, paymentNoGenerator);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -194,6 +215,7 @@ class PaymentServiceTest {
         verify(tradeOrderItemMapper, never()).selectList(any());
         verify(tradeOrderMapper, never()).markOrderPaid(any(), any(), any(), any(), any());
         verifyNoInteractions(paymentRecordMapper, inventoryService, paymentNoGenerator);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -208,6 +230,7 @@ class PaymentServiceTest {
         verify(tradeOrderItemMapper, never()).selectList(any());
         verify(tradeOrderMapper, never()).markOrderPaid(any(), any(), any(), any(), any());
         verifyNoInteractions(paymentRecordMapper, inventoryService, paymentNoGenerator);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -229,6 +252,7 @@ class PaymentServiceTest {
         );
         verify(paymentRecordMapper, never()).insert(any(PaymentRecordEntity.class));
         verifyNoInteractions(inventoryService, paymentNoGenerator);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -246,6 +270,7 @@ class PaymentServiceTest {
                 ErrorCode.TRADE_PAYMENT_RECORD_EXISTS
         );
         verifyNoInteractions(inventoryService);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     @Test
@@ -266,6 +291,7 @@ class PaymentServiceTest {
         );
         verify(paymentRecordMapper).insert(any(PaymentRecordEntity.class));
         verify(inventoryService).confirmLockedStock(30001L, 2);
+        verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
     }
 
     private CurrentUser currentUser() {

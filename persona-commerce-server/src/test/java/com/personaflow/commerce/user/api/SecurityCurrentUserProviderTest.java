@@ -43,6 +43,7 @@ class SecurityCurrentUserProviderTest {
 
         assertThat(currentUser.userId()).isEqualTo(10001L);
         assertThat(currentUser.roles()).containsExactly("ROLE_USER");
+        assertThat(provider.findCurrentUser()).contains(currentUser);
     }
 
     @Test
@@ -51,5 +52,10 @@ class SecurityCurrentUserProviderTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).errorCode())
                 .isEqualTo(ErrorCode.ACCOUNT_UNAUTHORIZED);
+    }
+
+    @Test
+    void findCurrentUserReturnsEmptyWhenNoAuthenticationExists() {
+        assertThat(provider.findCurrentUser()).isEmpty();
     }
 }

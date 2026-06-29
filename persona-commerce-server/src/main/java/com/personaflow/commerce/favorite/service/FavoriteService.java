@@ -1,6 +1,9 @@
 package com.personaflow.commerce.favorite.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.personaflow.commerce.behavior.enums.BehaviorEventType;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishCommand;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.common.vo.PageResult;
 import com.personaflow.commerce.favorite.entity.FavoriteEntity;
 import com.personaflow.commerce.favorite.mapper.FavoriteMapper;
@@ -14,10 +17,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Service
 public class FavoriteService {
+
+    private static final String SOURCE_MODULE = "shopping";
 
     private static final int DEFAULT_PAGE = 1;
     private static final int DEFAULT_SIZE = 10;
@@ -26,21 +32,24 @@ public class FavoriteService {
     private final FavoriteMapper favoriteMapper;
     private final CurrentUserProvider currentUserProvider;
     private final ProductQueryApi productQueryApi;
+    private final BehaviorEventPublishSupport behaviorEventPublishSupport;
 
     public FavoriteService(
             FavoriteMapper favoriteMapper,
             CurrentUserProvider currentUserProvider,
-            ProductQueryApi productQueryApi
+            ProductQueryApi productQueryApi,
+            BehaviorEventPublishSupport behaviorEventPublishSupport
     ) {
         this.favoriteMapper = favoriteMapper;
         this.currentUserProvider = currentUserProvider;
         this.productQueryApi = productQueryApi;
+        this.behaviorEventPublishSupport = behaviorEventPublishSupport;
     }
 
     @Transactional
     public FavoriteStatusVO addFavorite(Long skuId) {
         Long userId = currentUserProvider.requireCurrentUser().userId();
-        productQueryApi.requireSellableSku(skuId);
+        ProductSnapshot snapshot = productQueryApi.requireSellableSku(skuId);
 
         FavoriteEntity existingFavorite = favoriteMapper.selectOne(
                 Wrappers.<FavoriteEntity>lambdaQuery()
@@ -58,7 +67,14 @@ public class FavoriteService {
             favoriteMapper.insert(favorite);
         } catch (DuplicateKeyException exception) {
             // Concurrent duplicate favorite creation is treated as idempotent success.
+            return new FavoriteStatusVO(skuId, true);
         }
+        behaviorEventPublishSupport.publish(favoriteCommand(
+                BehaviorEventType.FAVORITE_ADD,
+                userId,
+                skuId,
+                snapshot
+        ));
         return new FavoriteStatusVO(skuId, true);
     }
 
@@ -70,6 +86,12 @@ public class FavoriteService {
                         .eq(FavoriteEntity::getUserId, userId)
                         .eq(FavoriteEntity::getSkuId, skuId)
         );
+        behaviorEventPublishSupport.publish(favoriteCommand(
+                BehaviorEventType.FAVORITE_REMOVE,
+                userId,
+                skuId,
+                null
+        ));
         return new FavoriteStatusVO(skuId, false);
     }
 
@@ -129,6 +151,45 @@ public class FavoriteService {
                 snapshot.imageUrl(),
                 favorite.getCreatedAt()
         );
+    }
+
+    private BehaviorEventPublishCommand favoriteCommand(
+            BehaviorEventType eventType,
+            Long userId,
+            Long skuId,
+            ProductSnapshot snapshot
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("skuId", skuId);
+        if (snapshot != null) {
+            putIfPresent(payload, "spuId", snapshot.spuId());
+            putIfPresent(payload, "categoryId", snapshot.categoryId());
+            putIfPresent(payload, "categoryName", snapshot.categoryName());
+            putIfPresent(payload, "productName", snapshot.productName());
+            putIfPresent(payload, "skuName", snapshot.skuName());
+            putIfPresent(payload, "price", snapshot.unitPrice());
+            putIfPresent(payload, "imageUrl", snapshot.imageUrl());
+        }
+        return new BehaviorEventPublishCommand(
+                eventType,
+                userId,
+                SOURCE_MODULE,
+                "SKU",
+                skuId,
+                null,
+                skuId,
+                snapshot == null ? null : snapshot.spuId(),
+                snapshot == null ? null : snapshot.categoryId(),
+                null,
+                snapshot == null ? null : snapshot.unitPrice(),
+                payload
+        );
+    }
+
+    private void putIfPresent(Map<String, Object> payload, String key, Object value) {
+        if (value != null) {
+            payload.put(key, value);
+        }
     }
 
     private int normalizePage(Integer page) {

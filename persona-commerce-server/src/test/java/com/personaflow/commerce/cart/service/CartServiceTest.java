@@ -1,5 +1,8 @@
 package com.personaflow.commerce.cart.service;
 
+import com.personaflow.commerce.behavior.enums.BehaviorEventType;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishCommand;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.cart.dto.AddCartItemRequest;
 import com.personaflow.commerce.cart.dto.UpdateCartItemRequest;
 import com.personaflow.commerce.cart.entity.CartItemEntity;
@@ -46,11 +49,19 @@ class CartServiceTest {
     @Mock
     private ProductQueryApi productQueryApi;
 
+    @Mock
+    private BehaviorEventPublishSupport behaviorEventPublishSupport;
+
     private CartService cartService;
 
     @BeforeEach
     void setUp() {
-        cartService = new CartService(cartItemMapper, currentUserProvider, productQueryApi);
+        cartService = new CartService(
+                cartItemMapper,
+                currentUserProvider,
+                productQueryApi,
+                behaviorEventPublishSupport
+        );
     }
 
     @Test
@@ -62,6 +73,7 @@ class CartServiceTest {
             cartItem.setId(20L);
             return 1;
         });
+        when(productQueryApi.requireSellableSku(30001L)).thenReturn(snapshotMap().get(30001L));
 
         CartItemSimpleVO result = cartService.addCartItem(new AddCartItemRequest(30001L, 2));
 
@@ -75,6 +87,16 @@ class CartServiceTest {
         assertThat(cartItemCaptor.getValue().getUserId()).isEqualTo(10001L);
         assertThat(cartItemCaptor.getValue().getSkuId()).isEqualTo(30001L);
         assertThat(cartItemCaptor.getValue().getQuantity()).isEqualTo(2);
+
+        ArgumentCaptor<BehaviorEventPublishCommand> commandCaptor =
+                ArgumentCaptor.forClass(BehaviorEventPublishCommand.class);
+        verify(behaviorEventPublishSupport).publish(commandCaptor.capture());
+        BehaviorEventPublishCommand command = commandCaptor.getValue();
+        assertThat(command.eventType()).isEqualTo(BehaviorEventType.CART_ADD);
+        assertThat(command.userId()).isEqualTo(10001L);
+        assertThat(command.sourceModule()).isEqualTo("shopping");
+        assertThat(command.skuId()).isEqualTo(30001L);
+        assertThat(command.spuId()).isEqualTo(20001L);
     }
 
     @Test
@@ -106,6 +128,7 @@ class CartServiceTest {
         );
         verifyNoInteractions(productQueryApi);
         verify(cartItemMapper, never()).selectOne(any());
+        verify(behaviorEventPublishSupport, never()).publish(any());
     }
 
     @Test
@@ -162,6 +185,12 @@ class CartServiceTest {
 
         verify(cartItemMapper).delete(any());
         verifyNoInteractions(productQueryApi);
+        ArgumentCaptor<BehaviorEventPublishCommand> commandCaptor =
+                ArgumentCaptor.forClass(BehaviorEventPublishCommand.class);
+        verify(behaviorEventPublishSupport).publish(commandCaptor.capture());
+        assertThat(commandCaptor.getValue().eventType()).isEqualTo(BehaviorEventType.CART_REMOVE);
+        assertThat(commandCaptor.getValue().objectId()).isEqualTo(10L);
+        assertThat(commandCaptor.getValue().skuId()).isEqualTo(30001L);
     }
 
     @Test
@@ -175,6 +204,7 @@ class CartServiceTest {
         );
         verifyNoInteractions(productQueryApi);
         verify(cartItemMapper, never()).delete(any());
+        verify(behaviorEventPublishSupport, never()).publish(any());
     }
 
     @Test
@@ -186,6 +216,11 @@ class CartServiceTest {
 
         verify(cartItemMapper).delete(any());
         verifyNoInteractions(productQueryApi);
+        ArgumentCaptor<BehaviorEventPublishCommand> commandCaptor =
+                ArgumentCaptor.forClass(BehaviorEventPublishCommand.class);
+        verify(behaviorEventPublishSupport).publish(commandCaptor.capture());
+        assertThat(commandCaptor.getValue().eventType()).isEqualTo(BehaviorEventType.CART_CLEAR);
+        assertThat(commandCaptor.getValue().userId()).isEqualTo(10001L);
     }
 
     @Test

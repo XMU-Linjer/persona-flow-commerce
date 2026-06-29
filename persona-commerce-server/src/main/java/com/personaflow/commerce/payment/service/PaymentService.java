@@ -1,6 +1,9 @@
 package com.personaflow.commerce.payment.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.personaflow.commerce.behavior.enums.BehaviorEventType;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishCommand;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.inventory.service.InventoryService;
@@ -20,14 +23,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @Service
 public class PaymentService {
 
     public static final int PAYMENT_STATUS_SUCCESS = 20;
     private static final String CHANNEL_MOCK = "MOCK";
+    private static final String SOURCE_MODULE = "trade";
 
     private final TradeOrderMapper tradeOrderMapper;
     private final TradeOrderItemMapper tradeOrderItemMapper;
@@ -35,6 +41,7 @@ public class PaymentService {
     private final CurrentUserProvider currentUserProvider;
     private final InventoryService inventoryService;
     private final PaymentNoGenerator paymentNoGenerator;
+    private final BehaviorEventPublishSupport behaviorEventPublishSupport;
 
     public PaymentService(
             TradeOrderMapper tradeOrderMapper,
@@ -42,7 +49,8 @@ public class PaymentService {
             PaymentRecordMapper paymentRecordMapper,
             CurrentUserProvider currentUserProvider,
             InventoryService inventoryService,
-            PaymentNoGenerator paymentNoGenerator
+            PaymentNoGenerator paymentNoGenerator,
+            BehaviorEventPublishSupport behaviorEventPublishSupport
     ) {
         this.tradeOrderMapper = tradeOrderMapper;
         this.tradeOrderItemMapper = tradeOrderItemMapper;
@@ -50,6 +58,7 @@ public class PaymentService {
         this.currentUserProvider = currentUserProvider;
         this.inventoryService = inventoryService;
         this.paymentNoGenerator = paymentNoGenerator;
+        this.behaviorEventPublishSupport = behaviorEventPublishSupport;
     }
 
     @Transactional
@@ -98,6 +107,7 @@ public class PaymentService {
             inventoryService.confirmLockedStock(orderItem.getSkuId(), orderItem.getQuantity());
         }
 
+        behaviorEventPublishSupport.publishAfterCommit(paymentSuccessCommand(userId, order, orderItems, paymentRecord));
         return toPaymentVO(paymentRecord);
     }
 
@@ -147,6 +157,76 @@ public class PaymentService {
     private void expectOneRow(int affectedRows, String message) {
         if (affectedRows != 1) {
             throw new IllegalStateException(message);
+        }
+    }
+
+    private BehaviorEventPublishCommand paymentSuccessCommand(
+            Long userId,
+            TradeOrderEntity order,
+            List<TradeOrderItemEntity> orderItems,
+            PaymentRecordEntity paymentRecord
+    ) {
+        List<Map<String, Object>> itemPayloads = orderItems.stream()
+                .map(this::orderItemPayload)
+                .toList();
+        Map<String, Object> payload = new LinkedHashMap<>();
+        putIfPresent(payload, "orderId", order.getId());
+        putIfPresent(payload, "orderNo", order.getOrderNo());
+        putIfPresent(payload, "totalAmount", order.getTotalAmount());
+        putIfPresent(payload, "paymentNo", paymentRecord.getPaymentNo());
+        putIfPresent(payload, "channel", paymentRecord.getChannel());
+        putIfPresent(payload, "status", PAYMENT_STATUS_SUCCESS);
+        putIfPresent(payload, "paidAt", paymentRecord.getPaidAt());
+        payload.put("preferenceConfirmed", true);
+        payload.put("needFulfilled", true);
+        payload.put("complementTriggered", true);
+        payload.put("items", itemPayloads);
+
+        return new BehaviorEventPublishCommand(
+                BehaviorEventType.PAYMENT_SUCCESS,
+                userId,
+                SOURCE_MODULE,
+                "ORDER",
+                order.getId(),
+                null,
+                firstSkuId(orderItems),
+                firstSpuId(orderItems),
+                firstCategoryId(orderItems),
+                order.getId(),
+                paymentRecord.getAmount(),
+                payload
+        );
+    }
+
+    private Map<String, Object> orderItemPayload(TradeOrderItemEntity item) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        putIfPresent(payload, "skuId", item.getSkuId());
+        putIfPresent(payload, "spuId", item.getSpuId());
+        putIfPresent(payload, "categoryId", item.getCategoryId());
+        putIfPresent(payload, "categoryName", item.getCategoryName());
+        putIfPresent(payload, "productName", item.getProductName());
+        putIfPresent(payload, "skuName", item.getSkuName());
+        putIfPresent(payload, "unitPrice", item.getUnitPrice());
+        putIfPresent(payload, "quantity", item.getQuantity());
+        putIfPresent(payload, "subtotal", item.getSubtotal());
+        return payload;
+    }
+
+    private Long firstSkuId(List<TradeOrderItemEntity> items) {
+        return items.isEmpty() ? null : items.get(0).getSkuId();
+    }
+
+    private Long firstSpuId(List<TradeOrderItemEntity> items) {
+        return items.isEmpty() ? null : items.get(0).getSpuId();
+    }
+
+    private Long firstCategoryId(List<TradeOrderItemEntity> items) {
+        return items.isEmpty() ? null : items.get(0).getCategoryId();
+    }
+
+    private void putIfPresent(Map<String, Object> payload, String key, Object value) {
+        if (value != null) {
+            payload.put(key, value);
         }
     }
 }

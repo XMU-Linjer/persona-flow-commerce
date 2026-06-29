@@ -1,5 +1,8 @@
 package com.personaflow.commerce.favorite.service;
 
+import com.personaflow.commerce.behavior.enums.BehaviorEventType;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishCommand;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.common.vo.PageResult;
 import com.personaflow.commerce.favorite.entity.FavoriteEntity;
 import com.personaflow.commerce.favorite.mapper.FavoriteMapper;
@@ -43,11 +46,19 @@ class FavoriteServiceTest {
     @Mock
     private ProductQueryApi productQueryApi;
 
+    @Mock
+    private BehaviorEventPublishSupport behaviorEventPublishSupport;
+
     private FavoriteService favoriteService;
 
     @BeforeEach
     void setUp() {
-        favoriteService = new FavoriteService(favoriteMapper, currentUserProvider, productQueryApi);
+        favoriteService = new FavoriteService(
+                favoriteMapper,
+                currentUserProvider,
+                productQueryApi,
+                behaviorEventPublishSupport
+        );
     }
 
     @Test
@@ -55,6 +66,7 @@ class FavoriteServiceTest {
         when(currentUserProvider.requireCurrentUser()).thenReturn(currentUser());
         when(favoriteMapper.selectOne(any())).thenReturn(null);
         when(favoriteMapper.insert(any(FavoriteEntity.class))).thenReturn(1);
+        when(productQueryApi.requireSellableSku(30001L)).thenReturn(snapshotMap().get(30001L));
 
         FavoriteStatusVO result = favoriteService.addFavorite(30001L);
 
@@ -66,6 +78,16 @@ class FavoriteServiceTest {
         verify(favoriteMapper).insert(favoriteCaptor.capture());
         assertThat(favoriteCaptor.getValue().getUserId()).isEqualTo(10001L);
         assertThat(favoriteCaptor.getValue().getSkuId()).isEqualTo(30001L);
+
+        ArgumentCaptor<BehaviorEventPublishCommand> commandCaptor =
+                ArgumentCaptor.forClass(BehaviorEventPublishCommand.class);
+        verify(behaviorEventPublishSupport).publish(commandCaptor.capture());
+        BehaviorEventPublishCommand command = commandCaptor.getValue();
+        assertThat(command.eventType()).isEqualTo(BehaviorEventType.FAVORITE_ADD);
+        assertThat(command.userId()).isEqualTo(10001L);
+        assertThat(command.sourceModule()).isEqualTo("shopping");
+        assertThat(command.skuId()).isEqualTo(30001L);
+        assertThat(command.spuId()).isEqualTo(20001L);
     }
 
     @Test
@@ -79,6 +101,7 @@ class FavoriteServiceTest {
         assertThat(result.favorited()).isTrue();
         verify(productQueryApi).requireSellableSku(30001L);
         verify(favoriteMapper, never()).insert(any(FavoriteEntity.class));
+        verify(behaviorEventPublishSupport, never()).publish(any());
     }
 
     @Test
@@ -93,6 +116,7 @@ class FavoriteServiceTest {
         assertThat(result.skuId()).isEqualTo(30001L);
         assertThat(result.favorited()).isTrue();
         verify(productQueryApi).requireSellableSku(30001L);
+        verify(behaviorEventPublishSupport, never()).publish(any());
     }
 
     @Test
@@ -106,6 +130,12 @@ class FavoriteServiceTest {
         assertThat(result.favorited()).isFalse();
         verify(favoriteMapper).delete(any());
         verifyNoInteractions(productQueryApi);
+
+        ArgumentCaptor<BehaviorEventPublishCommand> commandCaptor =
+                ArgumentCaptor.forClass(BehaviorEventPublishCommand.class);
+        verify(behaviorEventPublishSupport).publish(commandCaptor.capture());
+        assertThat(commandCaptor.getValue().eventType()).isEqualTo(BehaviorEventType.FAVORITE_REMOVE);
+        assertThat(commandCaptor.getValue().skuId()).isEqualTo(30001L);
     }
 
     @Test

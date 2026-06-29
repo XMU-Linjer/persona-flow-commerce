@@ -1,6 +1,9 @@
 package com.personaflow.commerce.order.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.personaflow.commerce.behavior.enums.BehaviorEventType;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishCommand;
+import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.common.vo.PageResult;
@@ -32,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +50,7 @@ public class OrderService {
     private static final int DEFAULT_PAGE = 1;
     private static final int DEFAULT_SIZE = 10;
     private static final int MAX_SIZE = 100;
+    private static final String SOURCE_MODULE = "trade";
 
     private final TradeOrderMapper tradeOrderMapper;
     private final TradeOrderItemMapper tradeOrderItemMapper;
@@ -55,6 +60,7 @@ public class OrderService {
     private final ProductQueryApi productQueryApi;
     private final InventoryService inventoryService;
     private final OrderNoGenerator orderNoGenerator;
+    private final BehaviorEventPublishSupport behaviorEventPublishSupport;
 
     public OrderService(
             TradeOrderMapper tradeOrderMapper,
@@ -64,7 +70,8 @@ public class OrderService {
             AddressQueryApi addressQueryApi,
             ProductQueryApi productQueryApi,
             InventoryService inventoryService,
-            OrderNoGenerator orderNoGenerator
+            OrderNoGenerator orderNoGenerator,
+            BehaviorEventPublishSupport behaviorEventPublishSupport
     ) {
         this.tradeOrderMapper = tradeOrderMapper;
         this.tradeOrderItemMapper = tradeOrderItemMapper;
@@ -74,6 +81,7 @@ public class OrderService {
         this.productQueryApi = productQueryApi;
         this.inventoryService = inventoryService;
         this.orderNoGenerator = orderNoGenerator;
+        this.behaviorEventPublishSupport = behaviorEventPublishSupport;
     }
 
     @Transactional
@@ -132,6 +140,7 @@ public class OrderService {
                     return toOrderItemVO(orderItem);
                 })
                 .toList();
+        behaviorEventPublishSupport.publishAfterCommit(orderCreatedCommand(userId, order, itemVOs));
 
         return new OrderCreateVO(
                 order.getId(),
@@ -254,6 +263,7 @@ public class OrderService {
             inventoryService.releaseLockedStock(orderItem.getSkuId(), orderItem.getQuantity());
         }
 
+        behaviorEventPublishSupport.publishAfterCommit(orderCanceledCommand(userId, order, orderItems, canceledAt));
         return new OrderStatusVO(order.getId(), order.getOrderNo(), STATUS_CANCELED, canceledAt);
     }
 
@@ -382,6 +392,102 @@ public class OrderService {
     private void expectOneRow(int affectedRows, String message) {
         if (affectedRows != 1) {
             throw new IllegalStateException(message);
+        }
+    }
+
+    private BehaviorEventPublishCommand orderCreatedCommand(
+            Long userId,
+            TradeOrderEntity order,
+            List<OrderItemVO> items
+    ) {
+        return new BehaviorEventPublishCommand(
+                BehaviorEventType.ORDER_CREATED,
+                userId,
+                SOURCE_MODULE,
+                "ORDER",
+                order.getId(),
+                null,
+                firstSkuId(items),
+                firstSpuId(items),
+                firstCategoryId(items),
+                order.getId(),
+                order.getTotalAmount(),
+                orderPayload(order, STATUS_PENDING_PAYMENT, order.getCreatedAt(), items)
+        );
+    }
+
+    private BehaviorEventPublishCommand orderCanceledCommand(
+            Long userId,
+            TradeOrderEntity order,
+            List<TradeOrderItemEntity> orderItems,
+            LocalDateTime canceledAt
+    ) {
+        List<OrderItemVO> itemVOs = orderItems.stream()
+                .map(this::toOrderItemVO)
+                .toList();
+        return new BehaviorEventPublishCommand(
+                BehaviorEventType.ORDER_CANCELED,
+                userId,
+                SOURCE_MODULE,
+                "ORDER",
+                order.getId(),
+                null,
+                firstSkuId(itemVOs),
+                firstSpuId(itemVOs),
+                firstCategoryId(itemVOs),
+                order.getId(),
+                order.getTotalAmount(),
+                orderPayload(order, STATUS_CANCELED, canceledAt, itemVOs)
+        );
+    }
+
+    private Map<String, Object> orderPayload(
+            TradeOrderEntity order,
+            Integer status,
+            LocalDateTime occurredAt,
+            List<OrderItemVO> items
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        putIfPresent(payload, "orderId", order.getId());
+        putIfPresent(payload, "orderNo", order.getOrderNo());
+        putIfPresent(payload, "totalAmount", order.getTotalAmount());
+        putIfPresent(payload, "status", status);
+        putIfPresent(payload, "occurredAt", occurredAt);
+        payload.put("items", items.stream()
+                .map(this::orderItemPayload)
+                .toList());
+        return payload;
+    }
+
+    private Map<String, Object> orderItemPayload(OrderItemVO item) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        putIfPresent(payload, "skuId", item.skuId());
+        putIfPresent(payload, "spuId", item.spuId());
+        putIfPresent(payload, "categoryId", item.categoryId());
+        putIfPresent(payload, "categoryName", item.categoryName());
+        putIfPresent(payload, "productName", item.productName());
+        putIfPresent(payload, "skuName", item.skuName());
+        putIfPresent(payload, "unitPrice", item.unitPrice());
+        putIfPresent(payload, "quantity", item.quantity());
+        putIfPresent(payload, "subtotal", item.subtotal());
+        return payload;
+    }
+
+    private Long firstSkuId(List<OrderItemVO> items) {
+        return items.isEmpty() ? null : items.get(0).skuId();
+    }
+
+    private Long firstSpuId(List<OrderItemVO> items) {
+        return items.isEmpty() ? null : items.get(0).spuId();
+    }
+
+    private Long firstCategoryId(List<OrderItemVO> items) {
+        return items.isEmpty() ? null : items.get(0).categoryId();
+    }
+
+    private void putIfPresent(Map<String, Object> payload, String key, Object value) {
+        if (value != null) {
+            payload.put(key, value);
         }
     }
 

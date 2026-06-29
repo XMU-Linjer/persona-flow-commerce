@@ -9,19 +9,27 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
 @Component
 public class SecurityCurrentUserProvider implements CurrentUserProvider {
 
     @Override
     public CurrentUser requireCurrentUser() {
+        return findCurrentUser()
+                .orElseThrow(() -> new BusinessException(ErrorCode.ACCOUNT_UNAUTHORIZED));
+    }
+
+    @Override
+    public Optional<CurrentUser> findCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null
                 || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken
                 || !(authentication.getPrincipal() instanceof AuthenticatedUser authenticatedUser)) {
-            throw new BusinessException(ErrorCode.ACCOUNT_UNAUTHORIZED);
+            return Optional.empty();
         }
 
-        return new CurrentUser(authenticatedUser.userId(), authenticatedUser.roles());
+        return Optional.of(new CurrentUser(authenticatedUser.userId(), authenticatedUser.roles()));
     }
 }
