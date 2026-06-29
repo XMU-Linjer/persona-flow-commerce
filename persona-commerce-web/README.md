@@ -25,12 +25,12 @@ Not implemented in V1.0 frontend:
 
 ## API Base URL
 
-The backend defaults to `http://localhost:8080`.
+The backend defaults to `http://127.0.0.1:8080`.
 
 Set `VITE_API_BASE_URL` if needed:
 
 ```sh
-VITE_API_BASE_URL=http://localhost:8080
+VITE_API_BASE_URL=http://127.0.0.1:8080
 ```
 
 ## Project Setup
