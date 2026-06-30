@@ -18,6 +18,8 @@ V1.1 当前真正接入业务主链路的是 behavior 行为事件总线。
 
 Python `persona-agent-service` 保留 Agent 消息协议和 `commerce.agent.exchange` 拓扑能力，用于服务骨架和后续异步 Agent 工作流扩展。当前 `/api/behavior/me/profile/refresh` 的真实链路是 Java HTTP 调用 Python `POST /agent/profile/build`，不是异步 Agent 总线。
 
+V1.2 planned 将正式使用 `commerce.agent.exchange` 承载异步 Profile Agent workflow。详细设计见 [Agent 工作流消息总线](02-agent-workflow-bus.md)。
+
 ## 2. behavior 行为事件总线
 
 Exchange：
@@ -221,6 +223,8 @@ correlationId
 
 这些用于后续异步 Agent 工作流，不作为当前主演示路径。
 
+V1.2 planned 中，这组协议会升级为正式的 AgentMessage 合同，并配合 `agent_workflow`、`agent_task`、`agent_artifact` 记录 workflow 状态与 Artifact 留痕。
+
 ## 10. PAYMENT_SUCCESS 消息语义
 
 `behavior.payment.success` 是画像强信号，但不是“继续推荐当前 SKU”的指令。
@@ -248,3 +252,5 @@ Python Agent 和前端 AI 洞察页会把它展示为已满足需求和配套机
 ## 12. 结论
 
 V1.1 的 RabbitMQ 重点是 behavior 行为事件可靠采集。Agent 任务总线保留为后续架构扩展方向，当前真实画像刷新链路采用 Java HTTP 调 Python Agent，避免把项目夸大成已经具备生产级异步多 Agent 调度系统。
+
+V1.2 planned 将在不接真实 LLM、不实现完整 Outbox 的前提下，把 Agent 任务总线用于异步 Profile Agent workflow，重点展示状态追踪、Artifact 证据链和 Critic 审核。

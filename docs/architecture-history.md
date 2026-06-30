@@ -213,14 +213,74 @@ V1.1 没有实现：
 - `/ai-insights` 能展示 latest profile、fulfilledNeeds、complementOpportunities、doNotRecommend；
 - Python Agent 停止时刷新画像返回 `AGENT_SERVICE_UNAVAILABLE`，页面不白屏。
 
+## V1.2.0 - 异步 Profile Agent 工作流与 Artifact 追踪
+
+状态：planned
+
+### 目标
+
+把 V1.1 的同步画像刷新链路升级为异步 workflow，让 Profile Agent Team 的执行过程具备状态追踪、Artifact 留痕、Critic 审核和前端可解释展示。
+
+### 计划内容
+
+Java 后端：
+
+- 创建 `agent_workflow`；
+- 维护 `agent_task` 状态；
+- 保存 `agent_artifact`；
+- 通过 `commerce.agent.exchange` 投递 `AgentMessage`；
+- 接收 Agent workflow 结果；
+- workflow 成功后保存 `user_profile_version`；
+- 提供当前用户 workflow 查询接口。
+
+RabbitMQ Agent Bus：
+
+- 正式使用 `commerce.agent.exchange`；
+- 使用 `agent.task.assigned`、`agent.artifact.created`、`agent.task.completed`、`agent.task.failed`、`agent.workflow.completed` 等 routing key；
+- 保留基础重试、死信和消息追踪；
+- 不承诺完整 Outbox 或分布式事务。
+
+Python Agent：
+
+- Profile Manager 编排 Behavior / Intent / Trend / Profile Builder/Critic；
+- 每个 Agent 输出结构化 Artifact；
+- Critic 审核 `PAYMENT_SUCCESS` 语义；
+- 不接真实 LLM；
+- 不直接查询 Java 业务数据库。
+
+前端：
+
+- 在 `/ai-insights` 展示 workflow 列表；
+- 展示 task 状态；
+- 展示 Artifact；
+- 展示 Critic 审核结果与失败原因。
+
+### V1.2 边界
+
+V1.2 planned 不实现：
+
+- 真实 LLM；
+- OpenAI / Claude；
+- LangChain；
+- RAG；
+- 向量数据库；
+- 复杂推荐算法；
+- 真实支付；
+- 物流系统；
+- 生产级高并发压测；
+- 分布式事务；
+- Outbox 完整可靠消息。
+
+Admin Lite 可以放在后期展示增强，不是 V1.2 主线。
+
 ## 后续可能方向
 
 这些是未来规划，不属于当前已完成状态：
 
+- V1.2 异步 Agent workflow 落地；
 - 真实 LLM 画像生成；
 - RAG 商品知识增强；
 - Outbox 可靠投递；
-- 异步 Agent 任务总线主链路；
 - 推荐实验与指标；
 - admin 运营后台；
 - 生产级压测与容量治理。

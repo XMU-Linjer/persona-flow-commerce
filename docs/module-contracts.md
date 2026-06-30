@@ -1,6 +1,6 @@
 # PersonaFlow Commerce 模块合同
 
-> 状态：V1.0 主链路已完成，V1.1 behavior / Agent 画像链路已完成  
+> 状态：V1.0 主链路已完成，V1.1 behavior / Agent 画像链路已完成，V1.2 异步 Agent workflow 为 planned  
 > 更新时间：2026-06-30
 
 ## 1. 总体原则
@@ -267,6 +267,39 @@ commerce.agent.exchange
 
 当前真实画像刷新链路使用 Java HTTP 调 Python `POST /agent/profile/build`，不是异步 Agent 总线。
 
+### 7.3 V1.2 planned：Agent workflow 合同
+
+V1.2 计划正式使用 `commerce.agent.exchange` 作为异步 Profile Agent workflow 总线。
+
+计划合同：
+
+- Java 创建 `agent_workflow`，并通过 `AgentMessage` 投递任务；
+- Python Agent 通过 `AgentMessage` 接收任务、产出 Artifact、发布 task / workflow 状态；
+- Java 保存 `agent_task`、`agent_artifact` 和最终 `user_profile_version`；
+- Java 不直接查询 Python 内部状态；
+- Python Agent 不直接查询 Java 业务数据库；
+- Agent 之间只通过 AgentMessage / Artifact 交换结构化结果；
+- 当前用户隔离仍由 Java Controller 和 `CurrentUserProvider` 保证；
+- 前端只查询 Java 后端，不直接访问 Python Agent 或 RabbitMQ。
+
+V1.2 planned Artifact：
+
+```text
+BehaviorFactReport
+IntentReport
+TrendReport
+ProfileDraft
+ProfileAuditReport
+UserProfileVersion
+```
+
+V1.2 planned workflow / task 状态：
+
+```text
+agent_workflow: PENDING / RUNNING / SUCCEEDED / FAILED / CANCELED
+agent_task: PENDING / RUNNING / SUCCEEDED / FAILED / SKIPPED
+```
+
 ## 8. Java 后端与 Python Agent 合同
 
 Java 请求 Python：
@@ -362,6 +395,8 @@ POST /api/behavior/me/profile/refresh
 | RabbitMQ behavior bus | 已实现 |
 | AgentProfileContext | 已实现 |
 | Java -> Python profile build | 已实现 |
+| Agent workflow bus | V1.2 planned |
+| Agent Artifact tracking | V1.2 planned |
 | Python real LLM | 不实现 |
 | RAG | 不实现 |
 | Outbox | 不实现 |
