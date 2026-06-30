@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  DataAnalysis,
   Goods,
   Location,
   ShoppingCart,
@@ -26,6 +27,7 @@ const menuItems = [
   { path: '/cart', label: '购物车', icon: ShoppingCart },
   { path: '/addresses', label: '地址', icon: Location },
   { path: '/orders', label: '订单', icon: Tickets },
+  { path: '/ai-insights', label: 'AI 购物洞察', icon: DataAnalysis },
 ]
 
 function logout() {

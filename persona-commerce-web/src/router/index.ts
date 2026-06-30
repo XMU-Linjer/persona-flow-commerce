@@ -68,6 +68,12 @@ const router = createRouter({
       component: () => import('@/views/OrderDetailView.vue'),
       meta: { title: '订单详情', requiresAuth: true },
     },
+    {
+      path: '/ai-insights',
+      name: 'ai-insights',
+      component: () => import('@/views/ai/InsightView.vue'),
+      meta: { title: 'AI 购物洞察', requiresAuth: true },
+    },
   ],
 })
 
