@@ -1,136 +1,226 @@
-# Architecture History
+# PersonaFlow Commerce 架构历史
 
-本文记录 PersonaFlow Commerce 每个版本的架构变化。README 展示当前项目状态，具体设计放在对应架构文档中。
+> 更新时间：2026-06-30
 
-## V0.1.0 - 本地开发环境搭建
+## V1.0.0 - 电商主链路
 
-### 日期
+状态：completed
 
-2026-06-24
+### 目标
 
-### 状态
+先建立稳定、可演示、可测试的电商业务底座。
 
-已完成
+### 完成内容
 
-### 上一版本
+基础设施：
 
-无，项目刚开始建立。
-
-### 本版本
-
-完成本地开发环境和基础设施准备：
-
-- Java 17；
-- Node.js 与 npm；
-- Git；
-- Docker Desktop；
 - Docker Compose；
-- MySQL 8.4；
+- MySQL；
 - Redis；
-- RabbitMQ Management。
+- RabbitMQ 容器；
+- Spring Boot 读取项目根目录 `.env`。
 
-### 主要变化
+account：
 
-- 项目从空目录进入可开发状态；
-- 本地中间件统一由 Docker Compose 管理；
-- 环境变量通过 `.env` 管理，仓库只提交 `.env.example`。
+- 注册 / 登录；
+- JWT；
+- 当前用户；
+- 用户资料；
+- 修改密码；
+- 地址管理；
+- `CurrentUserProvider`；
+- `AddressQueryApi`。
 
-### 影响
+catalog：
 
-后续 Java 服务统一连接 Docker Compose 中的 MySQL、Redis 和 RabbitMQ。
+- 分类；
+- SPU；
+- SKU；
+- 商品列表；
+- 商品详情；
+- Redis 商品详情缓存；
+- `ProductQueryApi`；
+- `ProductSnapshot`。
 
-### 原因
+shopping：
 
-统一开发环境，减少本机安装和版本差异带来的问题。
+- 收藏；
+- 购物车；
+- 不负责订单、支付、库存。
 
-### 迁移
+trade：
 
-无。
+- `inventory_stock`；
+- `trade_order`；
+- `trade_order_item`；
+- `payment_record`；
+- 创建订单；
+- 查询订单；
+- 取消订单；
+- 模拟支付；
+- 库存锁定、释放、确认扣减。
 
----
+frontend：
 
-## V1.0.0 - 纯电商平台
+- Vue 3 + Element Plus；
+- 登录 / 注册；
+- 商品浏览；
+- 收藏；
+- 购物车；
+- 地址；
+- 结算；
+- 订单；
+- 取消订单；
+- 模拟支付。
 
-### 日期
+### 关键设计
 
-2026-06-29
+- trade 不直接读取 account / catalog / shopping 表；
+- 订单保存地址快照和商品快照；
+- 库存使用 `available_quantity` / `locked_quantity` / `sold_quantity`；
+- 创建订单：`available -> locked`；
+- 取消订单：`locked -> available`；
+- 模拟支付：`locked -> sold`；
+- 订单状态只允许：
+  - `PENDING_PAYMENT -> PAID`
+  - `PENDING_PAYMENT -> CANCELED`
 
-### 状态
+### V1.0 边界
 
-已完成
+V1.0 不实现 behavior、Agent、RAG、admin、真实支付、退款、物流和优惠券。
 
-### 上一版本
+## V1.1.0 - 行为事件与规则版画像链路
 
-V0.1.0 只完成了开发环境和基础设施，没有业务代码。
+状态：completed
 
-### 本版本
+### 目标
 
-完成 V1.0 后端和前端主链路：
+在 V1.0 电商主链路之上，增加行为事件采集、RabbitMQ 可靠消费、结构化画像上下文、Python 规则版 Profile Agent Team 和前端 AI 购物洞察展示。
 
-- account：注册、登录、当前用户、资料、密码、地址；
-- catalog：分类、SPU、SKU、商品列表、商品详情、SKU 查询、Redis 商品详情缓存；
-- shopping：收藏、购物车；
-- trade：库存、创建订单、订单查询、取消订单、模拟支付；
-- Vue 前端演示页面；
-- MySQL / Redis / RabbitMQ Docker Compose 基础设施。
+项目定位更新为：
 
-### 主要变化
+> 基于 Spring Boot + RabbitMQ + FastAPI 的电商行为事件驱动用户画像系统。
 
-从基础设施阶段进入完整电商主链路：
+### 完成内容
 
-- 新增 `persona-commerce-server`；
-- 新增 `persona-commerce-web`；
-- 新增 Flyway 迁移；
-- 新增 account、catalog、shopping、trade 核心表；
-- 建立统一响应、错误码、JWT 鉴权、库存三段模型和订单状态机；
-- 完成前后端本地联调。
+behavior 数据层：
 
-### 影响
+- `behavior_event`；
+- `behavior_consume_log`；
+- `user_profile_version`；
+- Flyway `V5__create_behavior_tables.sql`。
 
-V1.0 可以作为可演示的纯电商平台。RabbitMQ 容器已准备，但业务事件流、Agent 任务总线和用户画像不属于 V1.0 已完成范围。
+RabbitMQ behavior 总线：
 
-### 原因
+- `commerce.behavior.exchange`；
+- `behavior.persist.queue`；
+- `behavior.dead.queue`；
+- 手动 ACK；
+- 基础重试；
+- 死信队列；
+- consume log；
+- `eventId` 幂等落库。
 
-先建立稳定的电商业务底座，再在 V1.1 引入行为事件、异步消息和多 Agent 画像能力。
+业务事件发布：
 
-### 迁移
+- catalog 发布 `PRODUCT_VIEW` / `PRODUCT_SEARCH`；
+- shopping 发布 `FAVORITE_ADD` / `FAVORITE_REMOVE` / `CART_ADD` / `CART_REMOVE` / `CART_CLEAR`；
+- trade 发布 `ORDER_CREATED` / `PAYMENT_SUCCESS` / `ORDER_CANCELED`。
 
-通过 Flyway 从空库初始化 V1.0 表结构和演示数据。V0.1.0 没有业务数据需要迁移。
+behavior 查询与上下文：
 
----
+- `/api/behavior/me/events`；
+- `/api/behavior/me/summary`；
+- `/api/behavior/me/agent-context`；
+- `/api/behavior/me/profile/latest`；
+- `/api/behavior/me/profile/refresh`；
+- `AgentProfileContext`；
+- fulfilledNeeds；
+- evidenceEventIds；
+- `PAYMENT_SUCCESS` 需求状态标记。
 
-## V1.1.0 - 行为事件、RabbitMQ Agent 总线与画像团队
+Python Agent：
 
-### 日期
+- `persona-agent-service`；
+- FastAPI `GET /health`；
+- FastAPI `POST /agent/profile/build`；
+- 规则版 Profile Agent Team；
+- Behavior Agent；
+- Intent Agent；
+- Trend Agent；
+- Profile Builder/Critic。
 
-待完成
+Java / Python 链路：
 
-### 状态
+- Java 准备 `AgentProfileContext`；
+- Java HTTP 调 Python Agent；
+- Python 返回结构化画像结果；
+- Java 保存 `user_profile_version`；
+- Agent 不可用时返回 `AGENT_SERVICE_UNAVAILABLE`。
 
-设计中
+前端：
 
-### 上一版本
+- `/ai-insights`；
+- latest profile；
+- fulfilledNeeds；
+- complementOpportunities；
+- doNotRecommend；
+- 行为摘要；
+- 最近行为；
+- Agent 不可用错误展示，不白屏。
 
-V1.0.0 已完成纯电商平台，但没有行为事件流、Agent 画像和 RabbitMQ Agent 任务总线。
+### PAYMENT_SUCCESS 决策
 
-### 本版本
+V1.1 明确：
 
-计划加入 behavior 行为事件模块、RabbitMQ 行为事件总线、RabbitMQ Agent 任务总线、Python Profile Agent Team、用户画像版本和前端 AI 购物洞察展示。
+```text
+PAYMENT_SUCCESS = 偏好确认 + 当前需求满足 + 互补需求触发
+```
 
-### 主要变化
+因此成交 SKU / SPU：
 
-从纯电商平台扩展为具备行为事件流、异步消息通信和多 Agent 画像能力的 AI 电商项目。
+- 进入 `fulfilledNeeds`；
+- 进入短期 `doNotRecommend`；
+- 作为 `complementOpportunities` 的证据；
+- 不被简单视为继续推荐当前商品的正反馈。
 
-### 影响
+### 当前未实现
 
-新增 `docs/v1.1-architecture.md`、`docs/modules/05-behavior.md`、`docs/messaging/01-rabbitmq-agent-bus.md`、`docs/agents/01-profile-agent-team.md`。
+V1.1 没有实现：
 
-后续会新增 behavior/messaging Java 包、`behavior_event` 等表、RabbitMQ exchange/queue、Python Agent 服务和前端 AI 购物洞察页面。
+- 真实支付；
+- 真实推荐算法；
+- 真实 LLM；
+- RAG；
+- Outbox；
+- 分布式事务；
+- 生产级高并发压测；
+- 真实退款 / 物流 / 优惠券；
+- admin 管理后台。
 
-### 原因
+### 验证结果
 
-让项目从普通 Java 电商项目升级为具备异步消息、行为分析和多 Agent 协作的 AI 后端项目。
+当前已验证：
 
-### 迁移
+- Java 后端：219 tests passed；
+- Python Agent：21 pytest passed；
+- Vue 前端：`npm.cmd run build` passed；
+- Python `/health` UP；
+- Java `/actuator/health` UP；
+- db / rabbit / redis UP；
+- `/api/behavior/me/profile/refresh` 能真实调用 Python；
+- `/api/behavior/me/profile/latest` 能查到画像；
+- `/ai-insights` 能展示 latest profile、fulfilledNeeds、complementOpportunities、doNotRecommend；
+- Python Agent 停止时刷新画像返回 `AGENT_SERVICE_UNAVAILABLE`，页面不白屏。
 
-V1.0 业务数据无需迁移。V1.1 通过新增表、新增消息队列和新增服务完成扩展。
+## 后续可能方向
+
+这些是未来规划，不属于当前已完成状态：
+
+- 真实 LLM 画像生成；
+- RAG 商品知识增强；
+- Outbox 可靠投递；
+- 异步 Agent 任务总线主链路；
+- 推荐实验与指标；
+- admin 运营后台；
+- 生产级压测与容量治理。

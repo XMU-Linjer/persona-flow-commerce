@@ -1,216 +1,250 @@
-# RabbitMQ 行为事件与 Agent 任务总线设计
+# RabbitMQ 行为事件与 Agent 通信说明
 
-> 状态：V1.1 设计中  
-> 范围：RabbitMQ exchange、queue、routing key、消息协议和可靠性策略  
-> 更新时间：2026-06-29
+> 状态：completed for behavior bus；Agent task bus 为 Python 服务骨架能力  
+> 范围：RabbitMQ exchange、queue、routing key、消息可靠性和当前使用边界  
+> 更新时间：2026-06-30
 
-## 1. 设计目标
+## 1. 总体边界
 
-V1.1 使用 RabbitMQ 承担两类异步通信：
+V1.1 当前真正接入业务主链路的是 behavior 行为事件总线。
 
-- 行为事件总线：业务模块发布用户行为，behavior 模块消费并落库；
-- Agent 任务总线：Profile Manager 和各 Agent 之间传递任务、Artifact、挑战、返工和完成状态。
+已完成：
 
-两条链路使用不同 exchange，避免业务事件和 Agent 内部工作流耦合。
+- Java 后端声明并使用 `commerce.behavior.exchange`；
+- catalog / shopping / trade 发布行为事件；
+- behavior 消费事件并落库；
+- 手动 ACK、基础重试、死信队列、consume log；
+- `eventId` 幂等落库。
 
-## 2. 行为事件总线
+Python `persona-agent-service` 保留 Agent 消息协议和 `commerce.agent.exchange` 拓扑能力，用于服务骨架和后续异步 Agent 工作流扩展。当前 `/api/behavior/me/profile/refresh` 的真实链路是 Java HTTP 调用 Python `POST /agent/profile/build`，不是异步 Agent 总线。
 
-### 2.1 Exchange
+## 2. behavior 行为事件总线
+
+Exchange：
 
 ```text
 commerce.behavior.exchange
 ```
 
-类型：`topic`
-
-用途：catalog、shopping、trade 发布用户行为事件，behavior 模块消费并持久化。
-
-### 2.2 Routing Keys
+类型：
 
 ```text
-behavior.product.view
-behavior.product.search
-behavior.favorite.add
-behavior.favorite.remove
-behavior.cart.add
-behavior.cart.remove
-behavior.cart.clear
-behavior.order.created
-behavior.payment.success
-behavior.order.canceled
+topic
 ```
 
-### 2.3 Queues
+队列：
 
 ```text
 behavior.persist.queue
 behavior.dead.queue
 ```
 
-### 2.4 链路
+用途：
+
+- catalog、shopping、trade 发布用户行为事实；
+- behavior 模块消费并持久化到 `behavior_event`；
+- `behavior_consume_log` 记录消费状态；
+- 死信队列接收持续失败消息。
+
+## 3. behavior routing keys
+
+| 行为类型 | Routing key |
+|---|---|
+| `PRODUCT_VIEW` | `behavior.product.view` |
+| `PRODUCT_SEARCH` | `behavior.product.search` |
+| `FAVORITE_ADD` | `behavior.favorite.add` |
+| `FAVORITE_REMOVE` | `behavior.favorite.remove` |
+| `CART_ADD` | `behavior.cart.add` |
+| `CART_REMOVE` | `behavior.cart.remove` |
+| `CART_CLEAR` | `behavior.cart.clear` |
+| `ORDER_CREATED` | `behavior.order.created` |
+| `PAYMENT_SUCCESS` | `behavior.payment.success` |
+| `ORDER_CANCELED` | `behavior.order.canceled` |
+
+## 4. behavior 消息模型
+
+行为消息字段：
 
 ```text
-catalog / shopping / trade
--> commerce.behavior.exchange
--> behavior.persist.queue
--> behavior_event
+messageId
+eventId
+eventType
+userId
+sourceModule
+objectType
+objectId
+keyword
+skuId
+spuId
+categoryId
+orderId
+amount
+payloadJson
+occurredAt
+traceId
+version
 ```
 
-## 3. Agent 任务总线
+说明：
 
-### 3.1 Exchange
+- `messageId` 用于消息级追踪；
+- `eventId` 用于行为事实幂等；
+- `eventType` 必须能映射到 `BehaviorEventType`；
+- `payloadJson` 保存扩展上下文；
+- 不保存密码、JWT、收货人手机号、完整收货地址。
+
+## 5. behavior 消费流程
+
+```text
+收到消息
+-> 校验 eventType 和必要字段
+-> 写入 / 更新 behavior_consume_log PROCESSING
+-> 调用 BehaviorEventService.saveEvent(command)
+-> 重复 eventId 返回已有事件，不重复插入
+-> 更新 behavior_consume_log SUCCESS
+-> 手动 ACK
+```
+
+失败流程：
+
+```text
+校验失败或保存失败
+-> 记录 behavior_consume_log FAILED
+-> 抛出消费异常
+-> RabbitMQ 基础重试
+-> 持续失败进入 behavior.dead.queue
+```
+
+## 6. 可靠性策略
+
+已完成：
+
+- durable exchange；
+- durable queue；
+- 持久化消息；
+- 手动 ACK；
+- 基础重试；
+- 死信队列；
+- `messageId` 消费日志；
+- `eventId` 行为事件幂等。
+
+未实现：
+
+- Outbox 可靠投递；
+- 分布式事务；
+- Exactly-once 语义；
+- 消息堆积治理；
+- 死信可视化运营后台；
+- 生产级压测。
+
+当前策略适合本地演示和面试展示：主业务不被行为事件链路阻塞，同时行为消费具备可追踪和可恢复的基础能力。
+
+## 7. 业务模块发布边界
+
+catalog：
+
+- `PRODUCT_VIEW`
+- `PRODUCT_SEARCH`
+
+shopping：
+
+- `FAVORITE_ADD`
+- `FAVORITE_REMOVE`
+- `CART_ADD`
+- `CART_REMOVE`
+- `CART_CLEAR`
+
+trade：
+
+- `ORDER_CREATED`
+- `PAYMENT_SUCCESS`
+- `ORDER_CANCELED`
+
+发布原则：
+
+- 只发布已经发生的事实；
+- 发布失败不回滚主业务；
+- 不在 behavior 消费端修改主业务状态；
+- 不在消息中传敏感信息。
+
+## 8. Agent 通信骨架
+
+Python 服务中保留 Agent 通信协议和拓扑命名：
 
 ```text
 commerce.agent.exchange
 ```
 
-类型：`topic`
+设计用途：
 
-用途：Profile Manager 分发 Agent 任务，Agents 之间交换结构化 Artifact、challenge、revision 和 completion status。
+- Profile Manager 分发任务；
+- Agent 间传递结构化 Artifact；
+- challenge / revision / completed 等工作流消息；
+- 后续扩展异步画像任务。
 
-### 3.2 Routing Keys
+当前边界：
 
-```text
-agent.task.assigned
-agent.artifact.created
-agent.challenge.raised
-agent.revision.requested
-agent.revision.completed
-agent.task.completed
-agent.task.failed
-agent.workflow.completed
-```
+- V1.1 页面画像刷新链路不依赖 `commerce.agent.exchange`；
+- Java 通过 HTTP 调 Python `POST /agent/profile/build`；
+- Agent Team 使用规则版同步工作流生成画像；
+- 不实现复杂 Agent 异步调度；
+- 不实现 Outbox。
 
-### 3.3 Queue 建议
+## 9. Agent 消息协议方向
 
-```text
-agent.profile-manager.queue
-agent.behavior.queue
-agent.intent.queue
-agent.trend.queue
-agent.profile-builder.queue
-agent.dead.queue
-```
-
-### 3.4 链路
+保留的 Agent 消息字段：
 
 ```text
-Profile Manager
--> commerce.agent.exchange
--> Behavior Agent / Intent Agent / Trend Agent / Profile Builder-Critic
--> Artifact
--> user_profile_version
+messageId
+workflowId
+taskId
+sender
+receiver
+messageType
+artifactType
+artifactId
+payload
+createdAt
+correlationId
 ```
 
-## 4. Agent 统一消息协议
+保留的消息类型：
 
-Agent 消息统一使用 JSON，并通过 `workflowId`、`taskId`、`messageId` 和 `correlationId` 串联工作流。
+- `TASK_ASSIGNED`
+- `ARTIFACT_CREATED`
+- `CHALLENGE_RAISED`
+- `REVISION_REQUESTED`
+- `REVISION_COMPLETED`
+- `TASK_COMPLETED`
+- `TASK_FAILED`
+- `WORKFLOW_COMPLETED`
 
-```json
-{
-  "messageId": "msg-001",
-  "workflowId": "wf-001",
-  "taskId": "task-001",
-  "sender": "ProfileManager",
-  "receiver": "TrendAgent",
-  "messageType": "TASK_ASSIGNED",
-  "artifactType": null,
-  "artifactId": null,
-  "correlationId": "msg-parent",
-  "timestamp": "2026-06-29T10:00:00Z",
-  "payload": {}
-}
-```
+这些用于后续异步 Agent 工作流，不作为当前主演示路径。
 
-字段说明：
+## 10. PAYMENT_SUCCESS 消息语义
 
-| 字段 | 说明 |
-|---|---|
-| messageId | 消息唯一 ID |
-| workflowId | 一次画像工作流 ID |
-| taskId | 当前任务 ID |
-| sender | 发送者 |
-| receiver | 接收者 |
-| messageType | 消息类型 |
-| artifactType | Artifact 类型，可空 |
-| artifactId | Artifact ID，可空 |
-| correlationId | 父消息或关联消息 ID |
-| timestamp | 发送时间 |
-| payload | 结构化载荷 |
+`behavior.payment.success` 是画像强信号，但不是“继续推荐当前 SKU”的指令。
 
-## 5. Agent 消息类型
+它代表：
 
-| messageType | 说明 |
-|---|---|
-| `TASK_ASSIGNED` | Profile Manager 分配任务 |
-| `ARTIFACT_CREATED` | Agent 产出结构化 Artifact |
-| `CHALLENGE_RAISED` | Agent 或 Builder 对结果提出质疑 |
-| `REVISION_REQUESTED` | 请求返工 |
-| `REVISION_COMPLETED` | 返工完成 |
-| `TASK_COMPLETED` | 单个任务完成 |
-| `TASK_FAILED` | 单个任务失败 |
-| `WORKFLOW_COMPLETED` | 整个画像工作流完成 |
+- 偏好确认；
+- 当前需求满足；
+- 互补需求触发。
 
-## 6. Artifact 传递规则
+Python Agent 和前端 AI 洞察页会把它展示为已满足需求和配套机会证据。
 
-Agent 之间不传递任意自然语言结论，而是传递结构化 Artifact。
+## 11. 验证结果
 
-允许的 Artifact：
+当前已验证：
 
-- `BehaviorFactReport`
-- `IntentReport`
-- `TrendReport`
-- `ProfileDraft`
-- `ProfileAuditReport`
-- `UserProfileVersion`
+- behavior exchange / queue / binding 配置可用；
+- publisher 能发送行为消息；
+- consumer 能消费并落库；
+- consume log 能记录 SUCCESS / FAILED；
+- 重复 `eventId` 不重复落库；
+- 非法事件可进入失败路径；
+- Java 后端：219 tests passed。
 
-Artifact 可以先保存在 Java 后端或 Python Agent 服务自己的存储中，RabbitMQ 消息只传递 `artifactId`、`artifactType` 和必要摘要。
+## 12. 结论
 
-## 7. V1.1 首轮必须设计并说明的能力
-
-V1.1 第一轮需要设计并尽量实现：
-
-- 消息持久化；
-- 手动 ACK；
-- 死信队列；
-- 基础重试；
-- 消费幂等。
-
-行为事件的幂等键建议使用 `eventId`。Agent 消息的幂等键建议使用 `messageId`。
-
-## 8. V1.1 首轮可设计但不强制实现的增强
-
-以下能力进入 V1.1 后续增强，不要求第一轮实现：
-
-- Publisher Confirm；
-- 消息积压处理；
-- Outbox 可靠投递；
-- Agent 返工消息闭环的完整可视化；
-- Agent 工作流超时恢复；
-- 多 Agent 并发调度优化。
-
-这些能力必须在文档中留出扩展方向，但不能在第一轮为了追求完整而扩大实现范围。
-
-## 9. 行为事件失败策略
-
-- 事件发布失败不回滚主业务；
-- 消费失败先重试；
-- 多次失败进入 `behavior.dead.queue`；
-- 重复事件不重复写入 `behavior_event`；
-- 失败消息需要保留错误原因，便于后续排查。
-
-## 10. Agent 任务失败策略
-
-- Agent 单任务失败发布 `agent.task.failed`；
-- Profile Manager 负责判断是否重试、降级或终止工作流；
-- Profile Builder/Critic 可以请求一次返工；
-- 工作流最终失败不影响 V1.0 电商主链路。
-
-## 11. 当前设计结论
-
-V1.1 RabbitMQ 同时服务两类链路：
-
-- `commerce.behavior.exchange` 用于业务行为事件；
-- `commerce.agent.exchange` 用于 Agent 任务通信。
-
-两者职责分离、消息协议分离、队列分离。behavior 事件服务业务事实沉淀，Agent 任务总线服务画像团队协作。
+V1.1 的 RabbitMQ 重点是 behavior 行为事件可靠采集。Agent 任务总线保留为后续架构扩展方向，当前真实画像刷新链路采用 Java HTTP 调 Python Agent，避免把项目夸大成已经具备生产级异步多 Agent 调度系统。

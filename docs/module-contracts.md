@@ -1,35 +1,24 @@
-# PersonaFlow Commerce 模块约定
+# PersonaFlow Commerce 模块合同
 
-> 状态：V1.0 已实现，V1.1 behavior / RabbitMQ / Agent 合同进入设计收口  
-> 作用：定义模块之间允许如何协作，以及哪些内部实现不得跨模块访问  
-> 更新时间：2026-06-29
+> 状态：V1.0 主链路已完成，V1.1 behavior / Agent 画像链路已完成  
+> 更新时间：2026-06-30
 
-## 1. 基本原则
+## 1. 总体原则
 
-- 模块之间只通过公开 API 或明确的消息契约协作。
-- 不跨模块调用 Mapper。
-- 不跨模块导入 Entity。
-- 不通过 `common` 放置具体业务模型。
-- 跨模块返回模型必须是稳定的快照或专用 record，不能返回数据库 Entity。
-- 业务事件发布失败不回滚主业务，失败事件由日志、重试或后续补偿处理。
+模块之间通过明确接口协作，不跨边界直接读取其他模块的表或 Entity。
 
-## 2. V1.0 模块与包
+核心原则：
 
-| 业务模块 | Java 包 | 说明 |
-|---|---|---|
-| account | `auth`, `user` | 账号、认证、当前用户、地址 |
-| catalog | `product` | 商品目录、商品快照 |
-| shopping | `favorite`, `cart` | 收藏、购物车 |
-| trade | `inventory`, `order`, `payment` | 库存、订单、模拟支付 |
-| common | `common` | 统一技术基础 |
+- account 提供当前用户身份和地址快照；
+- catalog 提供商品快照；
+- shopping 只负责收藏和购物车；
+- trade 只通过跨模块 API 获取地址和商品快照；
+- behavior 只接收行为事实，不反向修改主业务；
+- Python Agent 只接收 Java 准备好的结构化上下文，不直接访问业务数据库。
 
-V1.0 不创建 `search` 包。复杂搜索留给后续版本。
+## 2. account 合同
 
-## 3. account 对外合同
-
-### 3.1 当前用户
-
-使用者：shopping、trade。
+### 2.1 CurrentUserProvider
 
 ```java
 public interface CurrentUserProvider {
@@ -46,17 +35,15 @@ public record CurrentUser(
 }
 ```
 
-约定：
+说明：
 
-- `CurrentUser` 只包含 `userId` 和 `roles`；
-- 不包含 `username`；
-- 不返回 `passwordHash`、地址、头像或资料字段；
-- 调用方不解析 JWT，不直接读取 `SecurityContext`；
-- `/api/users/me` 可以返回 `username`，但这是 account HTTP 接口自己的查询结果，不属于跨模块模型。
+- `CurrentUser` 不包含 username；
+- `requireCurrentUser()` 从认证上下文获取当前用户；
+- 不查询数据库；
+- 未登录时返回统一未认证错误；
+- 跨模块只能使用 `userId` 和 `roles`。
 
-### 3.2 地址快照
-
-使用者：trade。
+### 2.2 AddressQueryApi
 
 ```java
 public interface AddressQueryApi {
@@ -79,23 +66,16 @@ public record AddressSnapshot(
 }
 ```
 
-约定：
+说明：
 
-- account 负责校验地址存在且属于指定 `userId`；
-- trade 只保存快照，不长期依赖 `user_address` 当前值；
-- 不返回 `AddressEntity`；
-- `recipientPhone` 是收货联系电话，不是手机号登录能力。
+- 给 trade 创建订单时使用；
+- 只允许查询指定 userId 名下地址；
+- 返回快照，不返回 Entity；
+- `recipientPhone` 是收货联系电话，不是手机号登录身份。
 
-### 3.3 V1.0 不提供
+## 3. catalog 合同
 
-- `UserQueryApi`
-- `UserSummary`
-- admin 用户管理 API
-- 封号、解封、角色管理
-
-## 4. catalog 对外合同
-
-使用者：shopping、trade。
+### 3.1 ProductQueryApi
 
 ```java
 public interface ProductQueryApi {
@@ -120,98 +100,125 @@ public record ProductSnapshot(
 }
 ```
 
-约定：
+说明：
 
-- `requireSellableSku` 用于 shopping 加购、收藏校验和 trade 创建订单；
-- `requireSellableSkus` 用于购物车列表和订单创建时批量查询；
-- SKU、SPU、Category 都必须存在且启用或可售；
-- `unitPrice` 是当前商品单价，trade 创建订单时保存为订单价格快照；
-- `imageUrl` 优先 SKU 图片，没有则使用 SPU 主图；
+- shopping 加购、收藏列表、购物车列表使用；
+- trade 创建订单使用；
+- 返回当前商品展示快照；
+- 不返回 Entity；
 - 不返回库存；
-- 不负责扣库存、锁库存、库存流水或下单库存校验；
-- 不返回 `ProductSkuEntity`、`ProductSpuEntity` 或 `ProductCategoryEntity`。
+- 不负责扣库存。
 
-## 5. shopping 对外合同
+## 4. shopping 合同
 
-V1.0 shopping 只提供 HTTP 能力，不提供跨模块结算 API。
+V1.0 shopping 不向 trade 提供跨模块结算接口。
 
-shopping 内部只能通过：
+已完成范围：
 
-- `CurrentUserProvider` 获取当前 `userId`；
-- `ProductQueryApi` 校验 SKU 可售并获取 `ProductSnapshot`。
+- 收藏 SKU；
+- 取消收藏；
+- 收藏列表；
+- 加入购物车；
+- 修改购物车数量；
+- 删除购物车项；
+- 清空购物车；
+- 购物车列表。
 
-V1.0 暂不提供：
+不提供：
 
-- `CartCheckoutApi`
-- `CartQueryApi`
-- `CartItemSnapshot`
-- 获取待结算购物车项
-- 订单成功后移除已购买购物车项
+- `CartCheckoutApi`；
+- `CartQueryApi`；
+- `CartItemSnapshot`；
+- 从购物车创建订单；
+- 创建订单后自动清理购物车。
 
-trade V1.0 可以直接接收 `skuId + quantity` 创建订单。后续如果决定支持“从购物车结算”，再在 trade 设计阶段补充 `CartCheckoutApi` 和 `CartItemSnapshot`。
+trade 后续如要支持“从购物车结算”，需要在 trade 阶段另行设计合同。当前前端从购物车结算时直接传 `skuId + quantity` 给 trade 创建订单接口。
 
-## 6. trade 对外和依赖合同
-
-trade V1.0 负责库存、订单和模拟支付，不向其他模块提供跨模块 Java 查询 API。
+## 5. trade 合同
 
 trade 允许依赖：
 
 - `CurrentUserProvider`
 - `AddressQueryApi`
 - `ProductQueryApi`
-- trade 内部的 `InventoryService`
+- `InventoryService`
 
-trade 禁止：
+trade 不允许：
 
 - 直接读取 account 表；
 - 直接读取 catalog 表；
 - 直接读取 shopping 表；
 - 导入 account / catalog / shopping Entity；
-- 依赖 shopping 创建订单；
-- 创建订单后自动清理购物车。
+- 调用 shopping 清理购物车。
 
 创建订单时：
 
-- 从 account 获取当前用户和地址快照；
-- 从 catalog 获取商品快照；
-- trade 保存地址快照和商品快照；
-- trade 在事务中锁定库存并创建订单。
+- 保存地址快照；
+- 保存商品快照；
+- 调用库存锁定；
+- 状态为 `PENDING_PAYMENT = 10`。
 
-查询订单、取消订单和模拟支付不调用 `AddressQueryApi` 或 `ProductQueryApi`，只使用 trade 自己保存的快照。
+取消订单时：
 
-## 7. V1.1 behavior 事件合同
+- 只允许 `PENDING_PAYMENT -> CANCELED`；
+- 调用库存释放。
 
-V1.1 新增 behavior 行为事件模块。业务模块只描述已经发生的事实，不把 behavior 作为主业务流程的强事务依赖。
+模拟支付时：
 
-### 7.1 事件发布方
+- 只允许 `PENDING_PAYMENT -> PAID`；
+- 写入 `payment_record`；
+- 调用库存确认扣减。
 
-catalog 发布：
+## 6. behavior 事件合同
 
-- `PRODUCT_VIEW`
-- `PRODUCT_SEARCH`
+### 6.1 行为事件类型
 
-shopping 发布：
+```text
+PRODUCT_VIEW
+PRODUCT_SEARCH
+FAVORITE_ADD
+FAVORITE_REMOVE
+CART_ADD
+CART_REMOVE
+CART_CLEAR
+ORDER_CREATED
+PAYMENT_SUCCESS
+ORDER_CANCELED
+```
 
-- `FAVORITE_ADD`
-- `FAVORITE_REMOVE`
-- `CART_ADD`
-- `CART_REMOVE`
-- `CART_CLEAR`
+### 6.2 行为事件消息
 
-trade 发布：
+```text
+messageId
+eventId
+eventType
+userId
+sourceModule
+objectType
+objectId
+keyword
+skuId
+spuId
+categoryId
+orderId
+amount
+payloadJson
+occurredAt
+traceId
+version
+```
 
-- `ORDER_CREATED`
-- `PAYMENT_SUCCESS`
-- `ORDER_CANCELED`
+约定：
 
-### 7.2 失败处理
+- `eventId` 是行为事实幂等键；
+- `messageId` 是消息跟踪和消费日志键；
+- 行为事件只描述已经发生的事实；
+- 发布失败不回滚主业务；
+- behavior 不回调 catalog / shopping / trade 修改业务状态；
+- behavior 不控制购物车、库存、订单、支付状态；
+- payload 不保存密码、JWT、收货人手机号、完整收货地址。
 
-- 业务事件发布失败，不回滚 catalog / shopping / trade 主业务。
-- 行为事件失败可记录日志、进入重试、进入死信队列或由后续补偿处理。
-- behavior 不回调 catalog / shopping / trade 修改业务状态。
-- behavior 不控制购物车、库存、订单、支付状态。
-
-### 7.3 PAYMENT_SUCCESS 语义
+### 6.3 PAYMENT_SUCCESS 语义
 
 `PAYMENT_SUCCESS` 不表示继续推荐当前已购买 SKU / SPU。
 
@@ -223,11 +230,9 @@ trade 发布：
 
 成交后画像可以增强长期偏好，但短期推荐应避免继续推同一商品，优先考虑互补品、耗材、配件、复购周期或新需求探索。
 
-## 8. V1.1 RabbitMQ 合同
+## 7. RabbitMQ 合同
 
-V1.1 使用两条 RabbitMQ 链路：
-
-### 8.1 行为事件链路
+### 7.1 behavior 行为链路
 
 ```text
 catalog / shopping / trade
@@ -236,41 +241,127 @@ catalog / shopping / trade
 -> behavior_event
 ```
 
-行为链路用于业务模块发布用户行为事件，behavior 模块消费并持久化。
+已完成：
 
-### 8.2 Agent 任务链路
+- topic exchange；
+- durable queue；
+- 手动 ACK；
+- 基础重试；
+- 死信队列；
+- consume log；
+- `eventId` 幂等。
+
+### 7.2 Agent 通信骨架
+
+Python 服务保留：
 
 ```text
-Profile Manager
--> commerce.agent.exchange
--> Behavior Agent / Intent Agent / Trend Agent / Profile Builder-Critic
--> Artifact
--> user_profile_version
+commerce.agent.exchange
 ```
 
-Agent 链路用于 Python Agent 服务内部的任务分发、结构化 Artifact 传递、质疑、返工和工作流完成。
+用途：
 
-## 9. Java 后端与 Python Agent 合同
+- 后续异步 Profile Agent Team 任务分发；
+- 结构化 Artifact 消息；
+- challenge / revision / completed 等工作流消息。
 
-V1.1 中，Java 后端可以通过内部 HTTP 或 Agent Task Bus 向 Python Agent 提交画像任务。
+当前真实画像刷新链路使用 Java HTTP 调 Python `POST /agent/profile/build`，不是异步 Agent 总线。
+
+## 8. Java 后端与 Python Agent 合同
+
+Java 请求 Python：
+
+```http
+POST /agent/profile/build
+```
+
+Python 健康检查：
+
+```http
+GET /health
+```
+
+Java 提供给 Python 的输入是 `AgentProfileContext`。
+
+核心字段：
+
+- `userId`
+- `recentEvents`
+- `eventTypeCounts`
+- `recentKeywords`
+- `topCategories`
+- `viewedProducts`
+- `cartSignals`
+- `orderSignals`
+- `paidSignals`
+- `canceledSignals`
+- `fulfilledNeeds`
+- `evidenceEventIds`
+- `generatedAt`
+
+Python 返回：
+
+- `workflowId`
+- `summary`
+- `profile`
+- `fulfilledNeeds`
+- `complementOpportunities`
+- `doNotRecommend`
+- `evidence`
+
+约束：
+
+- Agent 不直接查询 account、catalog、shopping、trade 表；
+- Agent 不绕过 Java 权限控制；
+- Agent 不修改订单、库存、购物车或支付状态；
+- Agent 产出的用户画像版本由 Java 保存到 `user_profile_version`。
+
+## 9. V1.1 当前用户行为接口
+
+```http
+GET  /api/behavior/me/events
+GET  /api/behavior/me/summary
+GET  /api/behavior/me/agent-context
+GET  /api/behavior/me/profile/latest
+POST /api/behavior/me/profile/refresh
+```
 
 约定：
 
-- Java 后端负责权限校验和业务数据上下文准备；
-- Agent 不直接查询 account、catalog、shopping、trade 的业务表；
-- Agent 不绕过 Java 后端权限控制；
-- Agent 接收结构化上下文，输出结构化 Artifact；
-- Agent 产出的用户画像版本最终由 Java 侧受控保存到 `user_profile_version`。
+- 全部需要登录；
+- 只查询当前用户；
+- Controller 不接收 `userId`；
+- 不提供 admin 查询；
+- 不暴露敏感信息。
 
-## 10. 约定状态
+## 10. 未实现合同
+
+当前没有提供：
+
+- 真实支付合同；
+- 退款合同；
+- 物流合同；
+- 优惠券合同；
+- admin 管理合同；
+- 真实推荐算法合同；
+- 真实 LLM / RAG 合同；
+- Outbox 合同；
+- 分布式事务合同；
+- CartCheckoutApi / CartQueryApi / CartItemSnapshot。
+
+## 11. 合同状态
 
 | 合同 | 状态 |
 |---|---|
-| CurrentUserProvider / CurrentUser | V1.0 已实现 |
-| AddressQueryApi / AddressSnapshot | V1.0 已实现 |
-| ProductQueryApi / ProductSnapshot | V1.0 已实现 |
-| CartCheckoutApi / CartQueryApi / CartItemSnapshot | V1.0 不提供 |
-| behavior 事件类型和发布边界 | V1.1 设计确定 |
-| RabbitMQ 行为事件总线 | V1.1 设计确定 |
-| RabbitMQ Agent 任务总线 | V1.1 设计确定 |
-| Python Profile Agent Team Artifact 合同 | V1.1 设计确定 |
+| `CurrentUserProvider` | 已实现 |
+| `AddressQueryApi` | 已实现 |
+| `ProductQueryApi` | 已实现 |
+| shopping checkout API | V1.0 不提供 |
+| trade order API | 已实现 |
+| behavior event message | 已实现 |
+| RabbitMQ behavior bus | 已实现 |
+| AgentProfileContext | 已实现 |
+| Java -> Python profile build | 已实现 |
+| Python real LLM | 不实现 |
+| RAG | 不实现 |
+| Outbox | 不实现 |
