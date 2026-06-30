@@ -145,6 +145,8 @@ watch(() => route.params.spuId, loadDetail)
             class="detail-image"
             :src="product.mainImageUrl"
             :label="product.brand || product.categoryName"
+            :product-name="product.name"
+            :category-name="product.categoryName"
           />
 
           <div v-if="gallery.length > 1" class="thumb-row">
@@ -154,6 +156,8 @@ watch(() => route.params.spuId, loadDetail)
               class="thumb"
               :src="image"
               :label="product.brand || product.categoryName"
+              :product-name="product.name"
+              :category-name="product.categoryName"
             />
           </div>
         </div>

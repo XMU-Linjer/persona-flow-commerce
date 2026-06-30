@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" role="img" aria-label="wrist rest">
+  <rect width="320" height="220" rx="28" fill="#f7f3f0"/>
+  <rect x="58" y="92" width="204" height="56" rx="28" fill="#5f6470" stroke="#c9b8a5" stroke-width="6"/>
+  <path d="M92 120h136" stroke="#858b97" stroke-width="8" stroke-linecap="round"/>
+  <text x="160" y="190" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#5f5e63">Wrist Rest</text>
+</svg>

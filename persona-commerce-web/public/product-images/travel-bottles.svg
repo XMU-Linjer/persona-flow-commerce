@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" role="img" aria-label="travel bottles">
+  <rect width="320" height="220" rx="28" fill="#f7f4ef"/>
+  <g stroke="#b88f69" stroke-width="6">
+    <rect x="82" y="72" width="44" height="94" rx="16" fill="#ffe1c2"/>
+    <rect x="138" y="58" width="44" height="108" rx="16" fill="#d9eadf"/>
+    <rect x="194" y="82" width="44" height="84" rx="16" fill="#e7ddfa"/>
+  </g>
+  <path d="M94 62h20M150 48h20M206 72h20" stroke="#b88f69" stroke-width="7" stroke-linecap="round"/>
+  <text x="160" y="198" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#80654d">Travel Bottles</text>
+</svg>

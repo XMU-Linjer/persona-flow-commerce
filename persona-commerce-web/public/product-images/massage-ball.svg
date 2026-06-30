@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" role="img" aria-label="massage ball">
+  <rect width="320" height="220" rx="28" fill="#f7f3f5"/>
+  <circle cx="132" cy="116" r="42" fill="#e58aa1" stroke="#a95f75" stroke-width="7"/>
+  <circle cx="192" cy="116" r="42" fill="#f0b0c0" stroke="#a95f75" stroke-width="7"/>
+  <g fill="#fff0f4"><circle cx="118" cy="102" r="5"/><circle cx="146" cy="132" r="5"/><circle cx="184" cy="96" r="5"/><circle cx="206" cy="134" r="5"/></g>
+  <text x="160" y="194" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#8b5264">Massage Ball</text>
+</svg>

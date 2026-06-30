@@ -1,8 +1,13 @@
 <script setup lang="ts">
-withDefaults(
+import { computed } from 'vue'
+
+const props = withDefaults(
   defineProps<{
     src?: string
     label?: string
+    productName?: string
+    skuName?: string
+    categoryName?: string
     fit?: 'fill' | 'contain' | 'cover' | 'none' | 'scale-down'
   }>(),
   {
@@ -10,22 +15,79 @@ withDefaults(
     label: 'PersonaFlow',
   },
 )
+
+const demoImageRules: Array<[string[], string]> = [
+  [['pillowcase', '枕套'], '/product-images/pillowcase.svg'],
+  [['pillow', '记忆棉枕', '枕头'], '/product-images/pillow.svg'],
+  [['bedding', '四件套', '床品'], '/product-images/bedding.svg'],
+  [['aroma', 'sleep lamp', '香薰', '助眠灯'], '/product-images/aroma-lamp.svg'],
+  [['keyboard', 'keyforge', '机械键盘', '键盘'], '/product-images/keyboard.svg'],
+  [['mouse', '鼠标'], '/product-images/mouse.svg'],
+  [['deskmat', 'desk mat', '桌垫'], '/product-images/deskmat.svg'],
+  [['monitor-stand', 'monitor stand', '显示器支架'], '/product-images/monitor-stand.svg'],
+  [['wrist-rest', 'wrist rest', '腕托'], '/product-images/wrist-rest.svg'],
+  [['backpack', '背包'], '/product-images/backpack.svg'],
+  [['organizer', '收纳包', '数码收纳'], '/product-images/organizer.svg'],
+  [['power-bank', 'power bank', '移动电源'], '/product-images/power-bank.svg'],
+  [['travel-bottles', 'travel bottles', '分装瓶'], '/product-images/travel-bottles.svg'],
+  [['coffee-machine', 'coffee machine', '咖啡机'], '/product-images/coffee-machine.svg'],
+  [['coffee-beans', 'coffee beans', '咖啡豆'], '/product-images/coffee-beans.svg'],
+  [['coffee-filter', 'coffee filter', '滤纸'], '/product-images/coffee-filter.svg'],
+  [['thermos', '保温杯'], '/product-images/thermos.svg'],
+  [['yoga-mat', 'yoga mat', '瑜伽垫'], '/product-images/yoga-mat.svg'],
+  [['massage-ball', 'massage ball', '筋膜球'], '/product-images/massage-ball.svg'],
+  [['sports-bottle', 'sports bottle', '运动水杯'], '/product-images/sports-bottle.svg'],
+  [['towel', '速干毛巾', '毛巾'], '/product-images/towel.svg'],
+]
+
+const mappedDemoImage = computed(() => {
+  const sourceText = [
+    props.productName,
+    props.skuName,
+    props.categoryName,
+    props.label,
+    props.src,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  for (const [patterns, image] of demoImageRules) {
+    if (patterns.some((pattern) => sourceText.includes(pattern.toLowerCase()))) {
+      return image
+    }
+  }
+  return ''
+})
 </script>
 
 <template>
   <div class="product-image-shell">
-    <el-image v-if="src" class="product-image-shell__image" :src="src" :fit="fit">
+    <el-image v-if="props.src" class="product-image-shell__image" :src="props.src" :fit="props.fit">
       <template #error>
-        <div class="product-image-shell__fallback">
+        <img
+          v-if="mappedDemoImage"
+          class="product-image-shell__local"
+          :src="mappedDemoImage"
+          :alt="props.productName || props.skuName || props.label || 'demo product image'"
+        />
+        <div v-else class="product-image-shell__fallback">
           <span>PF</span>
-          <strong>{{ label || 'PersonaFlow' }}</strong>
+          <strong>{{ props.label || 'PersonaFlow' }}</strong>
         </div>
       </template>
     </el-image>
 
+    <img
+      v-else-if="mappedDemoImage"
+      class="product-image-shell__local"
+      :src="mappedDemoImage"
+      :alt="props.productName || props.skuName || props.label || 'demo product image'"
+    />
+
     <div v-else class="product-image-shell__fallback">
       <span>PF</span>
-      <strong>{{ label || 'PersonaFlow' }}</strong>
+      <strong>{{ props.label || 'PersonaFlow' }}</strong>
     </div>
   </div>
 </template>
@@ -37,9 +99,15 @@ withDefaults(
 }
 
 .product-image-shell__image,
+.product-image-shell__local,
 .product-image-shell__fallback {
   width: 100%;
   height: 100%;
+}
+
+.product-image-shell__local {
+  display: block;
+  object-fit: cover;
 }
 
 .product-image-shell__image :deep(.el-image__inner) {

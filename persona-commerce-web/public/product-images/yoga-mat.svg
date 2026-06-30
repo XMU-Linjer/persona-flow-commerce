@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" role="img" aria-label="yoga mat">
+  <rect width="320" height="220" rx="28" fill="#f0f7f1"/>
+  <rect x="76" y="88" width="176" height="72" rx="24" fill="#9dcfb0" stroke="#4e8a65" stroke-width="7"/>
+  <circle cx="96" cy="124" r="24" fill="#f0f7f1" stroke="#4e8a65" stroke-width="7"/>
+  <path d="M132 112h90M132 136h70" stroke="#d8f0df" stroke-width="8" stroke-linecap="round"/>
+  <text x="160" y="196" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#4e765b">Yoga Mat</text>
+</svg>

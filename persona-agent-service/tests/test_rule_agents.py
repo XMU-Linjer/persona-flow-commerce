@@ -1,4 +1,5 @@
 from persona_agent_service.agents.behavior_agent import BehaviorAgent
+from persona_agent_service.agents.complement_rules import complement_labels
 from persona_agent_service.agents.intent_agent import IntentAgent
 from persona_agent_service.agents.profile_builder_critic import ProfileBuilderCritic
 from persona_agent_service.agents.profile_manager import ProfileManager
@@ -121,6 +122,16 @@ def test_intent_agent_recognizes_fulfilled_and_does_not_continue_same_sku():
     assert report.current_intents == []
     assert report.complement_opportunities
     assert not any(opportunity.label.lower().startswith("same sku") for opportunity in report.complement_opportunities)
+
+
+def test_complement_rules_cover_demo_showcase_categories():
+    labels = complement_labels(["枕头", "咖啡机", "背包", "瑜伽垫", "键盘"])
+
+    assert "枕套" in labels
+    assert "咖啡豆" in labels
+    assert "数码收纳包" in labels
+    assert "运动水杯" in labels
+    assert "无线鼠标" in labels
 
 
 def test_trend_agent_outputs_rising_declining_and_noise_fields():

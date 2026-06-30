@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" role="img" aria-label="coffee filter">
+  <rect width="320" height="220" rx="28" fill="#f8f6ef"/>
+  <path d="M92 62h136l-28 108h-80z" fill="#fffaf0" stroke="#c49c64" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M118 92h84M126 118h68M134 144h52" stroke="#e3cda6" stroke-width="7" stroke-linecap="round"/>
+  <text x="160" y="200" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#7b613b">Coffee Filter</text>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" role="img" aria-label="power bank">
+  <rect width="320" height="220" rx="28" fill="#f1f5fb"/>
+  <rect x="104" y="54" width="112" height="128" rx="18" fill="#ffffff" stroke="#6f90c2" stroke-width="7"/>
+  <path d="M130 92h60M130 122h60M130 152h36" stroke="#9bb3d8" stroke-width="8" stroke-linecap="round"/>
+  <rect x="140" y="38" width="40" height="18" rx="6" fill="#6f90c2"/>
+  <text x="160" y="208" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#536f9e">Power Bank</text>
+</svg>

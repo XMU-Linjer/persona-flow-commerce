@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" role="img" aria-label="wireless mouse">
+  <rect width="320" height="220" rx="28" fill="#f2f7fb"/>
+  <path d="M160 54c42 0 66 34 66 78 0 34-26 60-66 60s-66-26-66-60c0-44 24-78 66-78z" fill="#ffffff" stroke="#7aa5c7" stroke-width="7"/>
+  <path d="M160 58v54" stroke="#7aa5c7" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="160" cy="88" r="8" fill="#f0b56f"/>
+  <text x="160" y="206" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#486b85">Mouse</text>
+</svg>

@@ -125,7 +125,14 @@ onMounted(loadPage)
 
             <div class="checkout-items">
               <article v-for="item in checkoutItems" :key="item.skuId" class="checkout-item">
-                <ProductImage class="item-thumb" :src="item.imageUrl" :label="item.categoryName" />
+                <ProductImage
+                  class="item-thumb"
+                  :src="item.imageUrl"
+                  :label="item.categoryName"
+                  :product-name="item.productName"
+                  :sku-name="item.skuName"
+                  :category-name="item.categoryName"
+                />
                 <div class="item-info">
                   <strong>{{ item.productName }}</strong>
                   <span>{{ item.skuName }}</span>

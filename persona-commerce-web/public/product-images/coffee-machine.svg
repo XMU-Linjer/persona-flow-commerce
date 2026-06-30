@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" role="img" aria-label="capsule coffee machine">
+  <rect width="320" height="220" rx="28" fill="#f8f3ec"/>
+  <rect x="88" y="56" width="130" height="108" rx="20" fill="#fffaf1" stroke="#9a6a47" stroke-width="7"/>
+  <rect x="112" y="82" width="78" height="40" rx="10" fill="#4d3a32"/>
+  <path d="M198 114h34c12 0 20 9 20 20s-8 20-20 20h-34" fill="none" stroke="#9a6a47" stroke-width="7"/>
+  <path d="M128 142h50" stroke="#d5aa78" stroke-width="8" stroke-linecap="round"/>
+  <text x="160" y="198" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#76533a">Coffee Machine</text>
+</svg>

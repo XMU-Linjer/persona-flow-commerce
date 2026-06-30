@@ -62,7 +62,14 @@ onMounted(loadFavorites)
         <el-table-column label="商品" min-width="360">
           <template #default="{ row }: { row: FavoriteItem }">
             <div class="product-cell">
-              <ProductImage class="product-thumb" :src="row.imageUrl" :label="row.categoryName" />
+              <ProductImage
+                class="product-thumb"
+                :src="row.imageUrl"
+                :label="row.categoryName"
+                :product-name="row.productName"
+                :sku-name="row.skuName"
+                :category-name="row.categoryName"
+              />
               <div>
                 <strong>{{ row.productName }}</strong>
                 <span>{{ row.skuName }}</span>

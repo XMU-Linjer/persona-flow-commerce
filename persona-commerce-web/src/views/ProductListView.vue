@@ -101,6 +101,8 @@ onMounted(loadProducts)
             class="product-image"
             :src="product.mainImageUrl"
             :label="product.brand || product.categoryName"
+            :product-name="product.name"
+            :category-name="product.categoryName"
           />
 
           <div class="product-info">

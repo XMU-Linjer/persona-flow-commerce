@@ -143,7 +143,14 @@ onMounted(loadOrder)
 
           <div class="order-items">
             <article v-for="item in order.items" :key="item.skuId" class="order-item">
-              <ProductImage class="item-thumb" :src="item.imageUrl" :label="item.categoryName" />
+              <ProductImage
+                class="item-thumb"
+                :src="item.imageUrl"
+                :label="item.categoryName"
+                :product-name="item.productName"
+                :sku-name="item.skuName"
+                :category-name="item.categoryName"
+              />
               <div class="item-info">
                 <strong>{{ item.productName }}</strong>
                 <span>{{ item.skuName }}</span>
