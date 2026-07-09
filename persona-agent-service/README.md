@@ -84,11 +84,17 @@ BehaviorAgent
 
 DeepSeek only receives structured behavior context and rule-based artifacts. It must not control order creation, payment, inventory, cart, address, or any Java business API.
 
-Configuration is environment-variable based:
+DeepSeek configuration is project-level `.env` based. Put the local real values in the repository root:
 
 ```text
-DEEPSEEK_ENABLED=false
-DEEPSEEK_API_KEY=
+D:\Workspace\persona-flow-commerce\.env
+```
+
+Example:
+
+```text
+DEEPSEEK_ENABLED=true
+DEEPSEEK_API_KEY=your_deepseek_api_key
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-v4-flash
 DEEPSEEK_TIMEOUT_SECONDS=20
@@ -100,19 +106,26 @@ Rules:
 
 - Do not commit real API keys.
 - Do not print API keys in logs.
+- Do not set Windows User/System environment variables for DeepSeek.
+- Do not manually set PowerShell `$env:DEEPSEEK_API_KEY` before each startup.
+- The repository root `.env` is the local real configuration entry.
+- `.env` is ignored by Git; `.env.example` is only a template.
 - If `DEEPSEEK_ENABLED=false`, the service uses the rule-based profile.
 - If `DEEPSEEK_API_KEY` is missing, the service uses the rule-based profile.
 - If DeepSeek fails, times out, returns invalid JSON, or fails Critic validation, the service returns `FALLBACK_RULE_BASED`.
+- DeepSeek does not participate in order creation, inventory, payment, cart, address, or order status changes.
 - `/agent/profile/build` stays compatible with the Java backend; the final `profile.profile` JSON includes `generationMode`.
 
-Manual DeepSeek startup example:
+DeepSeek startup example:
 
 ```powershell
+cd D:\Workspace\persona-flow-commerce
+# Fill .env first:
+# DEEPSEEK_ENABLED=true
+# DEEPSEEK_API_KEY=your_deepseek_api_key
+
 cd D:\Workspace\persona-flow-commerce\persona-agent-service
 $env:PYTHONPATH = "src"
-$env:DEEPSEEK_ENABLED = "true"
-$env:DEEPSEEK_API_KEY = "<your-api-key>"
-$env:DEEPSEEK_MODEL = "deepseek-v4-flash"
 python -m uvicorn persona_agent_service.main:app --host 127.0.0.1 --port 8001
 ```
 
