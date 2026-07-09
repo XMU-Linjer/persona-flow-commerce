@@ -16,6 +16,7 @@ Completed:
 - `GET /health`
 - `POST /agent/profile/build`
 - Rule-based Profile Agent Team
+- Optional DeepSeek insight enhancement with rule-based fallback
 - Profile Manager
 - Behavior Agent
 - Intent Agent
@@ -23,16 +24,16 @@ Completed:
 - Profile Builder/Critic
 - Structured artifacts and profile response
 - PAYMENT_SUCCESS demand-state handling
-- pytest baseline: 21 pytest passed
+- pytest baseline: 39 pytest passed
 
 Not implemented:
 
-- real LLM calls
 - OpenAI / Claude integration
 - LangChain
 - RAG
 - vector database
 - real recommendation algorithm
+- LLM-controlled order, payment, inventory, or database writes
 - production-grade async multi-agent scheduler
 - direct database writes
 - direct order/cart/inventory modification
@@ -55,6 +56,7 @@ Python is responsible for:
 
 - receiving structured context
 - running the rule-based Profile Agent Team workflow
+- optionally enhancing the profile insight with DeepSeek when explicitly configured
 - returning structured profile results
 
 Python must not:
@@ -63,6 +65,56 @@ Python must not:
 - bypass Java authentication
 - modify orders, inventory, cart, address, or payment state
 - save profile versions to MySQL by itself
+
+## Optional DeepSeek Enhancement
+
+DeepSeek is an optional profile insight enhancement layer. The rule-based Agent remains the baseline and fallback.
+
+When enabled, the workflow is:
+
+```text
+BehaviorAgent
+-> IntentAgent
+-> TrendAgent
+-> ProfileBuilder/Critic rule-based baseline
+-> DeepSeekRecommendationAgent insight enhancement
+-> local Critic validation
+-> DEEPSEEK_ENHANCED or FALLBACK_RULE_BASED profile
+```
+
+DeepSeek only receives structured behavior context and rule-based artifacts. It must not control order creation, payment, inventory, cart, address, or any Java business API.
+
+Configuration is environment-variable based:
+
+```text
+DEEPSEEK_ENABLED=false
+DEEPSEEK_API_KEY=
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_TIMEOUT_SECONDS=20
+DEEPSEEK_MAX_TOKENS=1200
+DEEPSEEK_TEMPERATURE=0.2
+```
+
+Rules:
+
+- Do not commit real API keys.
+- Do not print API keys in logs.
+- If `DEEPSEEK_ENABLED=false`, the service uses the rule-based profile.
+- If `DEEPSEEK_API_KEY` is missing, the service uses the rule-based profile.
+- If DeepSeek fails, times out, returns invalid JSON, or fails Critic validation, the service returns `FALLBACK_RULE_BASED`.
+- `/agent/profile/build` stays compatible with the Java backend; the final `profile.profile` JSON includes `generationMode`.
+
+Manual DeepSeek startup example:
+
+```powershell
+cd D:\Workspace\persona-flow-commerce\persona-agent-service
+$env:PYTHONPATH = "src"
+$env:DEEPSEEK_ENABLED = "true"
+$env:DEEPSEEK_API_KEY = "<your-api-key>"
+$env:DEEPSEEK_MODEL = "deepseek-v4-flash"
+python -m uvicorn persona_agent_service.main:app --host 127.0.0.1 --port 8001
+```
 
 ## API
 
@@ -164,7 +216,7 @@ python -m pytest
 Current verified result:
 
 ```text
-21 pytest passed
+39 pytest passed
 ```
 
 ## Integration With Java
