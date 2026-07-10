@@ -7,6 +7,7 @@ import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.inventory.service.InventoryService;
+import com.personaflow.commerce.inventory.service.RedisStockService;
 import com.personaflow.commerce.order.entity.TradeOrderEntity;
 import com.personaflow.commerce.order.entity.TradeOrderItemEntity;
 import com.personaflow.commerce.order.mapper.TradeOrderItemMapper;
@@ -19,8 +20,12 @@ import com.personaflow.commerce.payment.support.PaymentNoGenerator;
 import com.personaflow.commerce.payment.vo.PaymentVO;
 import com.personaflow.commerce.user.api.CurrentUserProvider;
 import org.springframework.dao.DuplicateKeyException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -31,6 +36,8 @@ import java.util.Map;
 @Service
 public class PaymentService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(PaymentService.class);
+
     public static final int PAYMENT_STATUS_SUCCESS = 20;
     private static final String CHANNEL_MOCK = "MOCK";
     private static final String SOURCE_MODULE = "trade";
@@ -40,6 +47,7 @@ public class PaymentService {
     private final PaymentRecordMapper paymentRecordMapper;
     private final CurrentUserProvider currentUserProvider;
     private final InventoryService inventoryService;
+    private final RedisStockService redisStockService;
     private final PaymentNoGenerator paymentNoGenerator;
     private final BehaviorEventPublishSupport behaviorEventPublishSupport;
 
@@ -49,6 +57,7 @@ public class PaymentService {
             PaymentRecordMapper paymentRecordMapper,
             CurrentUserProvider currentUserProvider,
             InventoryService inventoryService,
+            RedisStockService redisStockService,
             PaymentNoGenerator paymentNoGenerator,
             BehaviorEventPublishSupport behaviorEventPublishSupport
     ) {
@@ -57,6 +66,7 @@ public class PaymentService {
         this.paymentRecordMapper = paymentRecordMapper;
         this.currentUserProvider = currentUserProvider;
         this.inventoryService = inventoryService;
+        this.redisStockService = redisStockService;
         this.paymentNoGenerator = paymentNoGenerator;
         this.behaviorEventPublishSupport = behaviorEventPublishSupport;
     }
@@ -106,6 +116,12 @@ public class PaymentService {
         for (TradeOrderItemEntity orderItem : orderItems) {
             inventoryService.confirmLockedStock(orderItem.getSkuId(), orderItem.getQuantity());
         }
+
+        runAfterCommitBestEffort(() -> {
+            for (TradeOrderItemEntity orderItem : orderItems) {
+                redisStockService.confirmSoldStock(orderItem.getSkuId(), orderItem.getQuantity());
+            }
+        });
 
         behaviorEventPublishSupport.publishAfterCommit(paymentSuccessCommand(userId, order, orderItems, paymentRecord));
         return toPaymentVO(paymentRecord);
@@ -157,6 +173,27 @@ public class PaymentService {
     private void expectOneRow(int affectedRows, String message) {
         if (affectedRows != 1) {
             throw new IllegalStateException(message);
+        }
+    }
+
+    private void runAfterCommitBestEffort(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            runBestEffort(action);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                runBestEffort(action);
+            }
+        });
+    }
+
+    private void runBestEffort(Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Failed to synchronize paid stock to Redis; MySQL remains the stock source of truth");
         }
     }
 

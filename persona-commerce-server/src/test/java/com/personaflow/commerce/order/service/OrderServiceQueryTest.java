@@ -5,6 +5,7 @@ import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.common.vo.PageResult;
 import com.personaflow.commerce.inventory.service.InventoryService;
+import com.personaflow.commerce.inventory.service.RedisStockService;
 import com.personaflow.commerce.order.entity.TradeOrderEntity;
 import com.personaflow.commerce.order.entity.TradeOrderItemEntity;
 import com.personaflow.commerce.order.mapper.TradeOrderItemMapper;
@@ -62,6 +63,9 @@ class OrderServiceQueryTest {
     private InventoryService inventoryService;
 
     @Mock
+    private RedisStockService redisStockService;
+
+    @Mock
     private OrderNoGenerator orderNoGenerator;
 
     @Mock
@@ -79,6 +83,7 @@ class OrderServiceQueryTest {
                 addressQueryApi,
                 productQueryApi,
                 inventoryService,
+                redisStockService,
                 orderNoGenerator,
                 behaviorEventPublishSupport
         );

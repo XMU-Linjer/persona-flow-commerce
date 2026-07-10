@@ -6,6 +6,7 @@ import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.inventory.service.InventoryService;
+import com.personaflow.commerce.inventory.service.RedisStockService;
 import com.personaflow.commerce.order.entity.TradeOrderEntity;
 import com.personaflow.commerce.order.entity.TradeOrderItemEntity;
 import com.personaflow.commerce.order.mapper.TradeOrderItemMapper;
@@ -64,6 +65,9 @@ class OrderServiceCancelTest {
     private InventoryService inventoryService;
 
     @Mock
+    private RedisStockService redisStockService;
+
+    @Mock
     private OrderNoGenerator orderNoGenerator;
 
     @Mock
@@ -81,6 +85,7 @@ class OrderServiceCancelTest {
                 addressQueryApi,
                 productQueryApi,
                 inventoryService,
+                redisStockService,
                 orderNoGenerator,
                 behaviorEventPublishSupport
         );
@@ -110,6 +115,8 @@ class OrderServiceCancelTest {
         assertThat(result.canceledAt()).isNotNull();
         verify(inventoryService).releaseLockedStock(30001L, 2);
         verify(inventoryService).releaseLockedStock(30002L, 1);
+        verify(redisStockService).releaseLockedStock(30001L, 2);
+        verify(redisStockService).releaseLockedStock(30002L, 1);
         verifyNoInteractions(addressQueryApi, productQueryApi, paymentRecordMapper);
 
         ArgumentCaptor<BehaviorEventPublishCommand> commandCaptor =

@@ -6,6 +6,7 @@ import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.inventory.service.InventoryService;
+import com.personaflow.commerce.inventory.service.RedisStockService;
 import com.personaflow.commerce.order.entity.TradeOrderEntity;
 import com.personaflow.commerce.order.entity.TradeOrderItemEntity;
 import com.personaflow.commerce.order.mapper.TradeOrderItemMapper;
@@ -60,6 +61,9 @@ class PaymentServiceTest {
     private InventoryService inventoryService;
 
     @Mock
+    private RedisStockService redisStockService;
+
+    @Mock
     private PaymentNoGenerator paymentNoGenerator;
 
     @Mock
@@ -75,6 +79,7 @@ class PaymentServiceTest {
                 paymentRecordMapper,
                 currentUserProvider,
                 inventoryService,
+                redisStockService,
                 paymentNoGenerator,
                 behaviorEventPublishSupport
         );
@@ -121,6 +126,8 @@ class PaymentServiceTest {
         );
         verify(inventoryService).confirmLockedStock(30001L, 2);
         verify(inventoryService).confirmLockedStock(30002L, 1);
+        verify(redisStockService).confirmSoldStock(30001L, 2);
+        verify(redisStockService).confirmSoldStock(30002L, 1);
 
         ArgumentCaptor<PaymentRecordEntity> paymentRecordCaptor = ArgumentCaptor.forClass(PaymentRecordEntity.class);
         verify(paymentRecordMapper).insert(paymentRecordCaptor.capture());

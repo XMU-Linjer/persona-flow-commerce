@@ -8,6 +8,7 @@ import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.common.vo.PageResult;
 import com.personaflow.commerce.inventory.service.InventoryService;
+import com.personaflow.commerce.inventory.service.RedisStockService;
 import com.personaflow.commerce.order.dto.CreateOrderItemRequest;
 import com.personaflow.commerce.order.dto.CreateOrderRequest;
 import com.personaflow.commerce.order.entity.TradeOrderEntity;
@@ -30,7 +31,11 @@ import com.personaflow.commerce.user.api.AddressQueryApi;
 import com.personaflow.commerce.user.api.CurrentUserProvider;
 import com.personaflow.commerce.user.api.model.AddressSnapshot;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -43,6 +48,8 @@ import java.util.Set;
 
 @Service
 public class OrderService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(OrderService.class);
 
     public static final int STATUS_PENDING_PAYMENT = 10;
     public static final int STATUS_PAID = 20;
@@ -59,6 +66,7 @@ public class OrderService {
     private final AddressQueryApi addressQueryApi;
     private final ProductQueryApi productQueryApi;
     private final InventoryService inventoryService;
+    private final RedisStockService redisStockService;
     private final OrderNoGenerator orderNoGenerator;
     private final BehaviorEventPublishSupport behaviorEventPublishSupport;
 
@@ -70,6 +78,7 @@ public class OrderService {
             AddressQueryApi addressQueryApi,
             ProductQueryApi productQueryApi,
             InventoryService inventoryService,
+            RedisStockService redisStockService,
             OrderNoGenerator orderNoGenerator,
             BehaviorEventPublishSupport behaviorEventPublishSupport
     ) {
@@ -80,6 +89,7 @@ public class OrderService {
         this.addressQueryApi = addressQueryApi;
         this.productQueryApi = productQueryApi;
         this.inventoryService = inventoryService;
+        this.redisStockService = redisStockService;
         this.orderNoGenerator = orderNoGenerator;
         this.behaviorEventPublishSupport = behaviorEventPublishSupport;
     }
@@ -105,51 +115,66 @@ public class OrderService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        for (CreateOrderItemRequest item : request.items()) {
-            inventoryService.lockStock(item.skuId(), item.quantity());
+        String reservationId = orderNoGenerator.generate();
+        boolean reservationCompletionRegistered = false;
+        try {
+            for (CreateOrderItemRequest item : request.items()) {
+                redisStockService.reserveStock(item.skuId(), item.quantity(), reservationId);
+            }
+            reservationCompletionRegistered = registerReservationCompletion(reservationId);
+
+            for (CreateOrderItemRequest item : request.items()) {
+                inventoryService.lockStock(item.skuId(), item.quantity());
+            }
+
+            LocalDateTime now = LocalDateTime.now();
+            TradeOrderEntity order = new TradeOrderEntity();
+            order.setOrderNo(reservationId);
+            order.setUserId(userId);
+            order.setAddressId(addressSnapshot.addressId());
+            order.setRecipientName(addressSnapshot.recipientName());
+            order.setRecipientPhone(addressSnapshot.recipientPhone());
+            order.setProvince(addressSnapshot.province());
+            order.setCity(addressSnapshot.city());
+            order.setDistrict(addressSnapshot.district());
+            order.setDetailAddress(addressSnapshot.detailAddress());
+            order.setPostalCode(addressSnapshot.postalCode());
+            order.setTotalAmount(totalAmount);
+            order.setStatus(STATUS_PENDING_PAYMENT);
+            order.setCreatedAt(now);
+            order.setUpdatedAt(now);
+            expectOneRow(tradeOrderMapper.insert(order), "Failed to create order");
+
+            List<OrderItemVO> itemVOs = preparedItems.stream()
+                    .map(preparedItem -> {
+                        TradeOrderItemEntity orderItem = toOrderItemEntity(
+                                preparedItem,
+                                order.getId(),
+                                order.getOrderNo(),
+                                userId,
+                                now
+                        );
+                        expectOneRow(tradeOrderItemMapper.insert(orderItem), "Failed to create order item");
+                        return toOrderItemVO(orderItem);
+                    })
+                    .toList();
+            behaviorEventPublishSupport.publishAfterCommit(orderCreatedCommand(userId, order, itemVOs));
+
+            if (!reservationCompletionRegistered) {
+                confirmReservationQuietly(reservationId);
+            }
+            return new OrderCreateVO(
+                    order.getId(),
+                    order.getOrderNo(),
+                    order.getTotalAmount(),
+                    order.getStatus(),
+                    order.getCreatedAt(),
+                    itemVOs
+            );
+        } catch (RuntimeException exception) {
+            releaseReservationQuietly(reservationId);
+            throw exception;
         }
-
-        LocalDateTime now = LocalDateTime.now();
-        TradeOrderEntity order = new TradeOrderEntity();
-        order.setOrderNo(orderNoGenerator.generate());
-        order.setUserId(userId);
-        order.setAddressId(addressSnapshot.addressId());
-        order.setRecipientName(addressSnapshot.recipientName());
-        order.setRecipientPhone(addressSnapshot.recipientPhone());
-        order.setProvince(addressSnapshot.province());
-        order.setCity(addressSnapshot.city());
-        order.setDistrict(addressSnapshot.district());
-        order.setDetailAddress(addressSnapshot.detailAddress());
-        order.setPostalCode(addressSnapshot.postalCode());
-        order.setTotalAmount(totalAmount);
-        order.setStatus(STATUS_PENDING_PAYMENT);
-        order.setCreatedAt(now);
-        order.setUpdatedAt(now);
-        expectOneRow(tradeOrderMapper.insert(order), "Failed to create order");
-
-        List<OrderItemVO> itemVOs = preparedItems.stream()
-                .map(preparedItem -> {
-                    TradeOrderItemEntity orderItem = toOrderItemEntity(
-                            preparedItem,
-                            order.getId(),
-                            order.getOrderNo(),
-                            userId,
-                            now
-                    );
-                    expectOneRow(tradeOrderItemMapper.insert(orderItem), "Failed to create order item");
-                    return toOrderItemVO(orderItem);
-                })
-                .toList();
-        behaviorEventPublishSupport.publishAfterCommit(orderCreatedCommand(userId, order, itemVOs));
-
-        return new OrderCreateVO(
-                order.getId(),
-                order.getOrderNo(),
-                order.getTotalAmount(),
-                order.getStatus(),
-                order.getCreatedAt(),
-                itemVOs
-        );
     }
 
     @Transactional(readOnly = true)
@@ -262,6 +287,12 @@ public class OrderService {
         for (TradeOrderItemEntity orderItem : orderItems) {
             inventoryService.releaseLockedStock(orderItem.getSkuId(), orderItem.getQuantity());
         }
+
+        runAfterCommitBestEffort("cancel order Redis stock synchronization", () -> {
+            for (TradeOrderItemEntity orderItem : orderItems) {
+                redisStockService.releaseLockedStock(orderItem.getSkuId(), orderItem.getQuantity());
+            }
+        });
 
         behaviorEventPublishSupport.publishAfterCommit(orderCanceledCommand(userId, order, orderItems, canceledAt));
         return new OrderStatusVO(order.getId(), order.getOrderNo(), STATUS_CANCELED, canceledAt);
@@ -392,6 +423,52 @@ public class OrderService {
     private void expectOneRow(int affectedRows, String message) {
         if (affectedRows != 1) {
             throw new IllegalStateException(message);
+        }
+    }
+
+    private boolean registerReservationCompletion(String reservationId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return false;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == TransactionSynchronization.STATUS_COMMITTED) {
+                    confirmReservationQuietly(reservationId);
+                } else {
+                    releaseReservationQuietly(reservationId);
+                }
+            }
+        });
+        return true;
+    }
+
+    private void runAfterCommitBestEffort(String operation, Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            runBestEffort(operation, action);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                runBestEffort(operation, action);
+            }
+        });
+    }
+
+    private void confirmReservationQuietly(String reservationId) {
+        runBestEffort("confirm Redis stock reservation", () -> redisStockService.confirmReservation(reservationId));
+    }
+
+    private void releaseReservationQuietly(String reservationId) {
+        runBestEffort("release Redis stock reservation", () -> redisStockService.releaseReservation(reservationId));
+    }
+
+    private void runBestEffort(String operation, Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Failed to {}; MySQL remains the stock source of truth", operation);
         }
     }
 

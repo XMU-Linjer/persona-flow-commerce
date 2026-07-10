@@ -6,6 +6,7 @@ import com.personaflow.commerce.behavior.enums.BehaviorEventType;
 import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishCommand;
 import com.personaflow.commerce.behavior.messaging.BehaviorEventPublishSupport;
 import com.personaflow.commerce.inventory.service.InventoryService;
+import com.personaflow.commerce.inventory.service.RedisStockService;
 import com.personaflow.commerce.order.dto.CreateOrderItemRequest;
 import com.personaflow.commerce.order.dto.CreateOrderRequest;
 import com.personaflow.commerce.order.entity.TradeOrderEntity;
@@ -38,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -68,6 +70,9 @@ class OrderServiceCreateTest {
     private InventoryService inventoryService;
 
     @Mock
+    private RedisStockService redisStockService;
+
+    @Mock
     private OrderNoGenerator orderNoGenerator;
 
     @Mock
@@ -85,6 +90,7 @@ class OrderServiceCreateTest {
                 addressQueryApi,
                 productQueryApi,
                 inventoryService,
+                redisStockService,
                 orderNoGenerator,
                 behaviorEventPublishSupport
         );
@@ -121,6 +127,9 @@ class OrderServiceCreateTest {
         verify(productQueryApi).requireSellableSkus(List.of(30001L, 30002L));
         verify(inventoryService).lockStock(30001L, 2);
         verify(inventoryService).lockStock(30002L, 1);
+        verify(redisStockService).reserveStock(30001L, 2, "PF20260628230000000123");
+        verify(redisStockService).reserveStock(30002L, 1, "PF20260628230000000123");
+        verify(redisStockService).confirmReservation("PF20260628230000000123");
 
         ArgumentCaptor<TradeOrderEntity> orderCaptor = ArgumentCaptor.forClass(TradeOrderEntity.class);
         verify(tradeOrderMapper).insert(orderCaptor.capture());
@@ -242,6 +251,7 @@ class OrderServiceCreateTest {
         when(currentUserProvider.requireCurrentUser()).thenReturn(currentUser());
         when(addressQueryApi.requireOwnedAddress(10001L, 1L)).thenReturn(addressSnapshot());
         when(productQueryApi.requireSellableSkus(List.of(30001L, 30002L))).thenReturn(productSnapshots());
+        when(orderNoGenerator.generate()).thenReturn("PF20260628230000000123");
         doThrow(new BusinessException(ErrorCode.TRADE_STOCK_NOT_ENOUGH))
                 .when(inventoryService)
                 .lockStock(30001L, 2);
@@ -252,7 +262,51 @@ class OrderServiceCreateTest {
         );
         verify(tradeOrderMapper, never()).insert(any(TradeOrderEntity.class));
         verify(tradeOrderItemMapper, never()).insert(any(TradeOrderItemEntity.class));
+        verify(redisStockService).releaseReservation("PF20260628230000000123");
         verify(behaviorEventPublishSupport, never()).publishAfterCommit(any());
+    }
+
+    @Test
+    void createOrderReleasesEarlierReservationsWhenAnotherSkuCannotBeReserved() {
+        when(currentUserProvider.requireCurrentUser()).thenReturn(currentUser());
+        when(addressQueryApi.requireOwnedAddress(10001L, 1L)).thenReturn(addressSnapshot());
+        when(productQueryApi.requireSellableSkus(List.of(30001L, 30002L))).thenReturn(productSnapshots());
+        when(orderNoGenerator.generate()).thenReturn("PF20260628230000000123");
+        doNothing().when(redisStockService).reserveStock(30001L, 2, "PF20260628230000000123");
+        doThrow(new BusinessException(ErrorCode.TRADE_STOCK_NOT_ENOUGH))
+                .when(redisStockService)
+                .reserveStock(30002L, 1, "PF20260628230000000123");
+
+        assertBusinessError(
+                () -> orderService.createOrder(request()),
+                ErrorCode.TRADE_STOCK_NOT_ENOUGH
+        );
+
+        verify(redisStockService).reserveStock(30001L, 2, "PF20260628230000000123");
+        verify(redisStockService).reserveStock(30002L, 1, "PF20260628230000000123");
+        verify(redisStockService).releaseReservation("PF20260628230000000123");
+        verifyNoInteractions(inventoryService);
+        verify(tradeOrderMapper, never()).insert(any(TradeOrderEntity.class));
+    }
+
+    @Test
+    void createOrderFailsClosedWhenRedisStockGateIsUnavailable() {
+        when(currentUserProvider.requireCurrentUser()).thenReturn(currentUser());
+        when(addressQueryApi.requireOwnedAddress(10001L, 1L)).thenReturn(addressSnapshot());
+        when(productQueryApi.requireSellableSkus(List.of(30001L, 30002L))).thenReturn(productSnapshots());
+        when(orderNoGenerator.generate()).thenReturn("PF20260628230000000123");
+        doThrow(new BusinessException(ErrorCode.TRADE_STOCK_SERVICE_UNAVAILABLE))
+                .when(redisStockService)
+                .reserveStock(30001L, 2, "PF20260628230000000123");
+
+        assertBusinessError(
+                () -> orderService.createOrder(request()),
+                ErrorCode.TRADE_STOCK_SERVICE_UNAVAILABLE
+        );
+
+        verifyNoInteractions(inventoryService);
+        verify(tradeOrderMapper, never()).insert(any(TradeOrderEntity.class));
+        verify(tradeOrderItemMapper, never()).insert(any(TradeOrderItemEntity.class));
     }
 
     private CreateOrderRequest request() {
