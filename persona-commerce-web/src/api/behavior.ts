@@ -1,5 +1,7 @@
 import http from './http'
 
+const PROFILE_REFRESH_TIMEOUT_MS = 35000
+
 export interface BehaviorEvent {
   id?: number
   eventId: string
@@ -113,5 +115,6 @@ export function getLatestProfile() {
 export function refreshProfile(params: { days?: number } = {}) {
   return http.post<UserProfileLatest, UserProfileLatest>('/api/behavior/me/profile/refresh', null, {
     params,
+    timeout: PROFILE_REFRESH_TIMEOUT_MS,
   })
 }

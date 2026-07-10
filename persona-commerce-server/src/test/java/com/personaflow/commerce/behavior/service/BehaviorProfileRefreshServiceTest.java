@@ -20,7 +20,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -72,9 +71,7 @@ class BehaviorProfileRefreshServiceTest {
             return savedProfile(command);
         });
 
-        long before = Instant.now().getEpochSecond();
         UserProfileLatestVO result = behaviorProfileRefreshService.refreshCurrentUserProfile(30);
-        long after = Instant.now().getEpochSecond();
 
         assertThat(result.userId()).isEqualTo(10001L);
         assertThat(result.exists()).isTrue();
@@ -86,7 +83,7 @@ class BehaviorProfileRefreshServiceTest {
         verify(userProfileVersionService).saveProfileVersion(commandCaptor.capture());
         UserProfileVersionCreateCommand command = commandCaptor.getValue();
         assertThat(command.userId()).isEqualTo(10001L);
-        assertThat(command.versionNo()).isBetween((int) before, (int) after);
+        assertThat(command.versionNo()).isNull();
         assertThat(command.profileJson()).contains("\"artifactId\":\"profile-001\"");
         assertThat(command.profileJson()).contains("\"profileSummary\":\"Keyboard buyer\"");
         assertThat(command.summary()).contains("keyboard");

@@ -155,6 +155,21 @@ def test_profile_manager_deepseek_failure_does_not_fail_build():
     assert "service unavailable" in result.profile.profile["llmError"]
 
 
+def test_profile_manager_unexpected_deepseek_failure_does_not_fail_build():
+    deepseek_agent = DeepSeekRecommendationAgent(
+        settings=enabled_settings(),
+        client=StubDeepSeekClient(exception=RuntimeError("unexpected provider error")),
+    )
+
+    result = ProfileManager(deepseek_recommendation_agent=deepseek_agent).build_profile(sample_context())
+
+    assert result.profile.profile["generationMode"] == GENERATION_FALLBACK_RULE_BASED
+    assert result.profile.profile["fulfilledNeeds"][0]["skuId"] == 30001
+    assert result.profile.profile["doNotRecommend"][0]["skuId"] == 30001
+    assert result.profile.profile["complementOpportunities"]
+    assert "RuntimeError" in result.profile.profile["llmError"]
+
+
 def test_profile_manager_profile_does_not_expose_sensitive_terms():
     result = ProfileManager().build_profile(sample_context())
     profile_text = str(result.profile.profile).lower()

@@ -3,6 +3,7 @@ package com.personaflow.commerce.behavior.service;
 import com.personaflow.commerce.behavior.dto.UserProfileVersionCreateCommand;
 import com.personaflow.commerce.behavior.entity.UserProfileVersionEntity;
 import com.personaflow.commerce.behavior.mapper.UserProfileVersionMapper;
+import org.springframework.dao.DuplicateKeyException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +16,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -65,6 +67,41 @@ class UserProfileVersionServiceTest {
         assertThat(profileCaptor.getAllValues())
                 .extracting(UserProfileVersionEntity::getVersionNo)
                 .containsExactly(1, 2);
+    }
+
+    @Test
+    void saveProfileVersionAllocatesNextVersionWhenCommandVersionIsNull() {
+        when(userProfileVersionMapper.selectOne(any())).thenReturn(profileVersion(2));
+        when(userProfileVersionMapper.insert(any(UserProfileVersionEntity.class))).thenAnswer(invocation -> {
+            UserProfileVersionEntity profileVersion = invocation.getArgument(0);
+            profileVersion.setId(3L);
+            return 1;
+        });
+
+        UserProfileVersionEntity result = userProfileVersionService.saveProfileVersion(command(null));
+
+        assertThat(result.getVersionNo()).isEqualTo(3);
+        verify(userProfileVersionMapper).selectOne(any());
+    }
+
+    @Test
+    void saveProfileVersionRetriesWhenAutoVersionConflicts() {
+        when(userProfileVersionMapper.selectOne(any()))
+                .thenReturn(profileVersion(2))
+                .thenReturn(profileVersion(3));
+        when(userProfileVersionMapper.insert(any(UserProfileVersionEntity.class)))
+                .thenThrow(new DuplicateKeyException("duplicate version"))
+                .thenAnswer(invocation -> {
+                    UserProfileVersionEntity profileVersion = invocation.getArgument(0);
+                    profileVersion.setId(4L);
+                    return 1;
+                });
+
+        UserProfileVersionEntity result = userProfileVersionService.saveProfileVersion(command(null));
+
+        assertThat(result.getVersionNo()).isEqualTo(4);
+        verify(userProfileVersionMapper, times(2)).selectOne(any());
+        verify(userProfileVersionMapper, times(2)).insert(any(UserProfileVersionEntity.class));
     }
 
     @Test

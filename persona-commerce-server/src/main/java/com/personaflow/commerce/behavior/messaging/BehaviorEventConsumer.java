@@ -38,7 +38,16 @@ public class BehaviorEventConsumer {
         long deliveryTag = amqpMessage.getMessageProperties().getDeliveryTag();
         try {
             validateMessage(message);
+            log.info(
+                    "Behavior message received messageId={}, eventId={}, eventType={}, userId={}, redelivered={}",
+                    message.messageId(),
+                    message.eventId(),
+                    message.eventType(),
+                    message.userId(),
+                    amqpMessage.getMessageProperties().isRedelivered()
+            );
             if (consumeLogService.isMessageSucceeded(message.messageId())) {
+                log.info("Behavior message already succeeded messageId={}, eventId={}", message.messageId(), message.eventId());
                 channel.basicAck(deliveryTag, false);
                 return;
             }
@@ -48,7 +57,17 @@ public class BehaviorEventConsumer {
             behaviorEventService.saveEvent(toCommand(message, eventType));
             consumeLogService.markSuccess(message.messageId(), message.eventId());
             channel.basicAck(deliveryTag, false);
+            log.info("Behavior message persisted messageId={}, eventId={}, eventType={}",
+                    message.messageId(), message.eventId(), message.eventType());
         } catch (Exception exception) {
+            log.warn(
+                    "Behavior message failed messageId={}, eventId={}, eventType={}, errorType={}, reason={}",
+                    message == null ? null : message.messageId(),
+                    message == null ? null : message.eventId(),
+                    message == null ? null : message.eventType(),
+                    exception.getClass().getSimpleName(),
+                    exception.getMessage()
+            );
             markFailedSafely(message, exception);
             rethrow(exception);
         }

@@ -9,7 +9,12 @@ from persona_agent_service.agents.intent_agent import IntentAgent
 from persona_agent_service.agents.profile_builder_critic import ProfileBuilderCritic
 from persona_agent_service.agents.trend_agent import TrendAgent
 from persona_agent_service.config.settings import AgentSettings
-from persona_agent_service.llm.exceptions import DeepSeekRequestError
+from persona_agent_service.llm.exceptions import (
+    DeepSeekAuthenticationError,
+    DeepSeekInvalidResponseError,
+    DeepSeekRequestError,
+    DeepSeekTimeoutError,
+)
 from persona_agent_service.schemas.context import AgentProfileContext
 
 
@@ -192,7 +197,124 @@ def test_deepseek_failure_falls_back_to_rule_based_profile():
     assert result.profile["generationMode"] == GENERATION_FALLBACK_RULE_BASED
     assert result.profile["profileSummary"] == profile.profile["profileSummary"]
     assert result.profile["fulfilledNeeds"][0]["repeatRecommendationSuppressed"] is True
+    assert "DeepSeekRequestError" in result.profile["llmError"]
     assert "boom" in result.profile["llmError"]
+
+
+def test_deepseek_authentication_error_falls_back_to_rule_based_profile():
+    context = sample_context()
+    behavior, intent, trend, profile = baseline(context)
+    agent = DeepSeekRecommendationAgent(
+        settings=enabled_settings(),
+        client=StubDeepSeekClient(exception=DeepSeekAuthenticationError("bad key")),
+    )
+
+    result = agent.enhance_profile(context, behavior, intent, trend, profile)
+
+    assert result.profile["generationMode"] == GENERATION_FALLBACK_RULE_BASED
+    assert result.profile["fulfilledNeeds"][0]["skuId"] == 30001
+    assert "DeepSeekAuthenticationError" in result.profile["llmError"]
+
+
+def test_deepseek_timeout_error_falls_back_to_rule_based_profile():
+    context = sample_context()
+    behavior, intent, trend, profile = baseline(context)
+    agent = DeepSeekRecommendationAgent(
+        settings=enabled_settings(),
+        client=StubDeepSeekClient(exception=DeepSeekTimeoutError("timeout")),
+    )
+
+    result = agent.enhance_profile(context, behavior, intent, trend, profile)
+
+    assert result.profile["generationMode"] == GENERATION_FALLBACK_RULE_BASED
+    assert result.profile["doNotRecommend"][0]["skuId"] == 30001
+    assert "DeepSeekTimeoutError" in result.profile["llmError"]
+
+
+def test_deepseek_invalid_json_error_falls_back_to_rule_based_profile():
+    context = sample_context()
+    behavior, intent, trend, profile = baseline(context)
+    agent = DeepSeekRecommendationAgent(
+        settings=enabled_settings(),
+        client=StubDeepSeekClient(exception=DeepSeekInvalidResponseError("invalid json")),
+    )
+
+    result = agent.enhance_profile(context, behavior, intent, trend, profile)
+
+    assert result.profile["generationMode"] == GENERATION_FALLBACK_RULE_BASED
+    assert result.profile["complementOpportunities"]
+    assert "DeepSeekInvalidResponseError" in result.profile["llmError"]
+
+
+def test_deepseek_schema_validation_error_falls_back_to_rule_based_profile():
+    insight = valid_insight()
+    insight["confidence"] = 2.0
+    context = sample_context()
+    behavior, intent, trend, profile = baseline(context)
+    agent = DeepSeekRecommendationAgent(settings=enabled_settings(), client=StubDeepSeekClient(insight))
+
+    result = agent.enhance_profile(context, behavior, intent, trend, profile)
+
+    assert result.profile["generationMode"] == GENERATION_FALLBACK_RULE_BASED
+    assert result.profile["fulfilledNeeds"][0]["skuId"] == 30001
+    assert "ValidationError" in result.profile["llmError"]
+
+
+def test_deepseek_prompt_build_failure_falls_back_to_rule_based_profile(monkeypatch):
+    context = sample_context()
+    behavior, intent, trend, profile = baseline(context)
+    agent = DeepSeekRecommendationAgent(settings=enabled_settings(), client=StubDeepSeekClient(valid_insight()))
+
+    def broken_prompt(*args, **kwargs):
+        raise RuntimeError("prompt failed")
+
+    monkeypatch.setattr(
+        "persona_agent_service.agents.deepseek_recommendation_agent.build_deepseek_user_prompt",
+        broken_prompt,
+    )
+
+    result = agent.enhance_profile(context, behavior, intent, trend, profile)
+
+    assert result.profile["generationMode"] == GENERATION_FALLBACK_RULE_BASED
+    assert result.profile["fulfilledNeeds"][0]["skuId"] == 30001
+    assert "RuntimeError" in result.profile["llmError"]
+
+
+def test_deepseek_merge_failure_falls_back_to_rule_based_profile(monkeypatch):
+    context = sample_context()
+    behavior, intent, trend, profile = baseline(context)
+    agent = DeepSeekRecommendationAgent(settings=enabled_settings(), client=StubDeepSeekClient(valid_insight()))
+
+    def broken_merge(*args, **kwargs):
+        raise TypeError("merge failed")
+
+    monkeypatch.setattr(agent, "_merge_insight", broken_merge)
+
+    result = agent.enhance_profile(context, behavior, intent, trend, profile)
+
+    assert result.profile["generationMode"] == GENERATION_FALLBACK_RULE_BASED
+    assert result.profile["doNotRecommend"][0]["skuId"] == 30001
+    assert "TypeError" in result.profile["llmError"]
+
+
+def test_deepseek_error_reason_redacts_api_key():
+    context = sample_context()
+    behavior, intent, trend, profile = baseline(context)
+    settings = AgentSettings(
+        deepseek_enabled=True,
+        deepseek_api_key="secret-test-key",
+        deepseek_model="deepseek-test",
+    )
+    agent = DeepSeekRecommendationAgent(
+        settings=settings,
+        client=StubDeepSeekClient(exception=RuntimeError("request used secret-test-key")),
+    )
+
+    result = agent.enhance_profile(context, behavior, intent, trend, profile)
+
+    assert result.profile["generationMode"] == GENERATION_FALLBACK_RULE_BASED
+    assert "secret-test-key" not in result.profile["llmError"]
+    assert "[redacted]" in result.profile["llmError"]
 
 
 def test_deepseek_output_recommending_fulfilled_sku_is_blocked_by_critic():

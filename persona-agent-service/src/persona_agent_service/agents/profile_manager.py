@@ -1,3 +1,5 @@
+import logging
+from time import perf_counter
 from uuid import uuid4
 
 from persona_agent_service.agents.behavior_agent import BehaviorAgent
@@ -7,6 +9,9 @@ from persona_agent_service.agents.profile_builder_critic import ProfileBuilderCr
 from persona_agent_service.agents.trend_agent import TrendAgent
 from persona_agent_service.schemas.context import AgentProfileContext
 from persona_agent_service.schemas.profile import ProfileBuildResult
+
+
+logger = logging.getLogger(__name__)
 
 
 class ProfileManager:
@@ -27,6 +32,7 @@ class ProfileManager:
         )
 
     def build_profile(self, context: AgentProfileContext) -> ProfileBuildResult:
+        started_at = perf_counter()
         workflow_id = f"workflow-{uuid4()}"
         behavior_report = self.behavior_agent.build_report(context, workflow_id)
         intent_report = self.intent_agent.build_report(context, workflow_id)
@@ -44,6 +50,13 @@ class ProfileManager:
             intent_report=intent_report,
             trend_report=trend_report,
             rule_based_profile=profile,
+        )
+        logger.info(
+            "Profile workflow completed workflowId=%s userId=%s generationMode=%s elapsedMs=%s",
+            workflow_id,
+            context.user_id,
+            profile.profile.get("generationMode", "unknown"),
+            round((perf_counter() - started_at) * 1000),
         )
         return ProfileBuildResult(
             workflowId=workflow_id,

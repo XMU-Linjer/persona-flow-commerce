@@ -1,4 +1,8 @@
-from fastapi import FastAPI, HTTPException
+import logging
+from time import perf_counter
+from uuid import uuid4
+
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from persona_agent_service.agents.mock_workflow import build_mock_profile_workflow
@@ -17,6 +21,7 @@ class MockWorkflowRequest(BaseModel):
 
 
 app = FastAPI(title="Persona Agent Service", version="0.1.0")
+logger = logging.getLogger(__name__)
 
 
 @app.get("/health")
@@ -54,5 +59,32 @@ def create_mock_profile_workflow(request: MockWorkflowRequest) -> dict[str, obje
 
 
 @app.post("/agent/profile/build", response_model=ProfileBuildResult)
-def build_profile(context: AgentProfileContext) -> ProfileBuildResult:
-    return ProfileManager().build_profile(context)
+def build_profile(context: AgentProfileContext, request: Request) -> ProfileBuildResult:
+    request_id = request.headers.get("x-profile-request-id") or f"python-{uuid4()}"
+    started_at = perf_counter()
+    logger.info(
+        "Profile build started requestId=%s userId=%s eventCount=%s evidenceCount=%s",
+        request_id,
+        context.user_id,
+        len(context.recent_events),
+        len(context.evidence_event_ids),
+    )
+    try:
+        result = ProfileManager().build_profile(context)
+        logger.info(
+            "Profile build succeeded requestId=%s userId=%s workflowId=%s generationMode=%s elapsedMs=%s",
+            request_id,
+            context.user_id,
+            result.workflow_id,
+            result.profile.profile.get("generationMode", "unknown"),
+            round((perf_counter() - started_at) * 1000),
+        )
+        return result
+    except Exception:
+        logger.exception(
+            "Profile build failed requestId=%s userId=%s elapsedMs=%s",
+            request_id,
+            context.user_id,
+            round((perf_counter() - started_at) * 1000),
+        )
+        raise

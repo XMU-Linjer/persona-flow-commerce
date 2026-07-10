@@ -12,14 +12,17 @@ import com.personaflow.commerce.behavior.vo.UserProfileLatestVO;
 import com.personaflow.commerce.common.error.BusinessException;
 import com.personaflow.commerce.common.error.ErrorCode;
 import com.personaflow.commerce.user.api.CurrentUserProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.Optional;
 
 @Service
 public class BehaviorProfileRefreshService {
+
+    private static final Logger log = LoggerFactory.getLogger(BehaviorProfileRefreshService.class);
 
     private final CurrentUserProvider currentUserProvider;
     private final BehaviorContextService behaviorContextService;
@@ -44,21 +47,58 @@ public class BehaviorProfileRefreshService {
     @Transactional
     public UserProfileLatestVO refreshCurrentUserProfile(Integer days) {
         Long userId = currentUserProvider.requireCurrentUser().userId();
-        AgentProfileContext context = behaviorContextService.buildAgentProfileContext(userId, days);
-        AgentProfileBuildResponse response = agentProfileClient.buildProfile(context);
-        AgentProfileResult profile = response.profile();
-        validateProfileUser(userId, profile);
+        long startedAt = System.nanoTime();
+        log.info("Profile refresh started userId={}, days={}", userId, days);
+        try {
+            AgentProfileContext context = behaviorContextService.buildAgentProfileContext(userId, days);
+            log.info(
+                    "Profile context built userId={}, recentEvents={}, evidenceEvents={}, eventTypes={}",
+                    userId,
+                    sizeOf(context.recentEvents()),
+                    sizeOf(context.evidenceEventIds()),
+                    context.eventTypeCounts() == null ? 0 : context.eventTypeCounts().size()
+            );
+            AgentProfileBuildResponse response = agentProfileClient.buildProfile(context);
+            AgentProfileResult profile = response.profile();
+            validateProfileUser(userId, profile);
 
-        UserProfileVersionEntity saved = userProfileVersionService.saveProfileVersion(
-                new UserProfileVersionCreateCommand(
-                        userId,
-                        generatedVersionNo(),
-                        profileJson(profile),
-                        profile.summary(),
-                        sourceWorkflowId(response, profile)
-                )
-        );
-        return UserProfileLatestVO.from(userId, Optional.of(saved));
+            UserProfileVersionEntity saved = userProfileVersionService.saveProfileVersion(
+                    new UserProfileVersionCreateCommand(
+                            userId,
+                            null,
+                            profileJson(profile),
+                            profile.summary(),
+                            sourceWorkflowId(response, profile)
+                    )
+            );
+            log.info(
+                    "Profile refresh succeeded userId={}, workflowId={}, profileVersionId={}, versionNo={}, elapsedMs={}",
+                    userId,
+                    saved.getSourceWorkflowId(),
+                    saved.getId(),
+                    saved.getVersionNo(),
+                    elapsedMillis(startedAt)
+            );
+            return UserProfileLatestVO.from(userId, Optional.of(saved));
+        } catch (RuntimeException exception) {
+            log.warn(
+                    "Profile refresh failed userId={}, days={}, elapsedMs={}, errorType={}, reason={}",
+                    userId,
+                    days,
+                    elapsedMillis(startedAt),
+                    exception.getClass().getSimpleName(),
+                    exception.getMessage()
+            );
+            throw exception;
+        }
+    }
+
+    private static int sizeOf(java.util.Collection<?> values) {
+        return values == null ? 0 : values.size();
+    }
+
+    private static long elapsedMillis(long startedAt) {
+        return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
     }
 
     private static void validateProfileUser(Long userId, AgentProfileResult profile) {
@@ -68,10 +108,6 @@ public class BehaviorProfileRefreshService {
         if (profile.userId() != null && !profile.userId().equals(userId)) {
             throw new BusinessException(ErrorCode.AGENT_PROFILE_BUILD_FAILED);
         }
-    }
-
-    private static Integer generatedVersionNo() {
-        return Math.toIntExact(Instant.now().getEpochSecond());
     }
 
     private String profileJson(AgentProfileResult profile) {

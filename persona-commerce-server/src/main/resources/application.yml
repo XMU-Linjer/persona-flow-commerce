@@ -34,7 +34,7 @@ persona:
   agent:
     base-url: ${PERSONA_AGENT_BASE_URL:http://127.0.0.1:8001}
     profile-build-path: /agent/profile/build
-    timeout-ms: 5000
+    timeout-ms: ${PERSONA_AGENT_TIMEOUT_MS:30000}
 
 management:
   endpoint:

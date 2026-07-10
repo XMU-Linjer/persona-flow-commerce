@@ -1,4 +1,6 @@
 import json
+import logging
+from time import perf_counter
 from typing import Any
 
 import httpx
@@ -12,6 +14,9 @@ from persona_agent_service.llm.exceptions import (
     DeepSeekRequestError,
     DeepSeekTimeoutError,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class DeepSeekClient:
@@ -42,7 +47,20 @@ class DeepSeekClient:
             "Authorization": f"Bearer {self.settings.deepseek_api_key}",
             "Content-Type": "application/json",
         }
+        started_at = perf_counter()
+        logger.info(
+            "DeepSeek request started model=%s timeoutSeconds=%s promptChars=%s",
+            self.settings.deepseek_model,
+            self.settings.deepseek_timeout_seconds,
+            len(system_prompt) + len(user_prompt),
+        )
         response = self._post(payload, headers)
+        logger.info(
+            "DeepSeek request succeeded model=%s status=%s elapsedMs=%s",
+            self.settings.deepseek_model,
+            response.status_code,
+            round((perf_counter() - started_at) * 1000),
+        )
         response_json = self._response_json(response)
         content = self._message_content(response_json)
         return self._content_json(content)

@@ -1,3 +1,5 @@
+import logging
+
 from pydantic import ValidationError
 
 from persona_agent_service.agents.profile_builder_critic import ProfileBuilderCritic
@@ -13,6 +15,8 @@ from persona_agent_service.schemas.llm import DeepSeekRecommendationInsight
 GENERATION_RULE_BASED = "RULE_BASED"
 GENERATION_DEEPSEEK_ENHANCED = "DEEPSEEK_ENHANCED"
 GENERATION_FALLBACK_RULE_BASED = "FALLBACK_RULE_BASED"
+
+logger = logging.getLogger(__name__)
 
 
 class DeepSeekRecommendationAgent:
@@ -53,10 +57,23 @@ class DeepSeekRecommendationAgent:
             insight = DeepSeekRecommendationInsight.model_validate(response)
             issues = self.critic.audit_deepseek_insight(context, insight)
             if issues:
+                logger.warning(
+                    "DeepSeek profile audit rejected userId=%s issueCount=%s issues=%s",
+                    context.user_id,
+                    len(issues),
+                    "; ".join(issues)[:500],
+                )
                 return self._fallback(rule_based_profile, "; ".join(issues))
+            logger.info(
+                "DeepSeek profile enhancement accepted userId=%s evidenceCount=%s",
+                context.user_id,
+                len(self._insight_evidence_ids(insight)),
+            )
             return self._merge_insight(rule_based_profile, insight)
         except (DeepSeekError, ValidationError, ValueError) as exception:
-            return self._fallback(rule_based_profile, str(exception))
+            return self._fallback_after_error(rule_based_profile, exception)
+        except Exception as exception:
+            return self._fallback_after_error(rule_based_profile, exception)
 
     def _merge_insight(
         self,
@@ -111,6 +128,30 @@ class DeepSeekRecommendationAgent:
             llm_enabled=True,
             llm_error=reason,
         )
+
+    def _fallback_after_error(
+        self,
+        rule_based_profile: UserProfileVersion,
+        exception: Exception,
+    ) -> UserProfileVersion:
+        reason = self._safe_error_reason(exception)
+        logger.warning(
+            "DeepSeek profile enhancement failed; fallback to rule-based profile. errorType=%s reason=%s generationMode=%s",
+            exception.__class__.__name__,
+            reason,
+            GENERATION_FALLBACK_RULE_BASED,
+        )
+        return self._fallback(rule_based_profile, reason)
+
+    def _safe_error_reason(self, exception: Exception) -> str:
+        message = str(exception)
+        if self.settings.deepseek_api_key:
+            message = message.replace(self.settings.deepseek_api_key, "[redacted]")
+        if len(message) > 500:
+            message = message[:500] + "..."
+        if not message:
+            return exception.__class__.__name__
+        return f"{exception.__class__.__name__}: {message}"
 
     def _with_generation_metadata(
         self,

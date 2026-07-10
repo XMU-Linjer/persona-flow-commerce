@@ -9,7 +9,7 @@ public class AgentProperties {
 
     private String baseUrl = "http://127.0.0.1:8001";
     private String profileBuildPath = "/agent/profile/build";
-    private long timeoutMs = 5000;
+    private long timeoutMs = 30000;
 
     public String getBaseUrl() {
         return baseUrl;
