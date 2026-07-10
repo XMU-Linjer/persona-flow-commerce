@@ -26,7 +26,7 @@ const demoImageRules: Array<[string[], string]> = [
   [['coffee-filter', 'coffee filter', '滤纸'], '/product-images/coffee-filter.webp'],
   [['coffee-beans', 'coffee beans', '咖啡豆', 'mountain roast'], '/product-images/coffee-beans.webp'],
   [['thermos', '保温杯', '随行杯'], '/product-images/thermos.webp'],
-  [['tea', '乌龙茶', '茶'], '/product-images/tea.webp'],
+  [['tea', 'oolong', 'calmleaf', '乌龙茶', '茶饮'], '/product-images/tea.webp'],
 
   [['backpack', '背包', '通勤包'], '/product-images/backpack.webp'],
   [['organizer', '收纳包', '数码收纳'], '/product-images/organizer.webp'],

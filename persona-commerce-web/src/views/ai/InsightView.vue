@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   Connection,
@@ -21,6 +22,8 @@ import {
   type BehaviorSummary,
   type UserProfileLatest,
 } from '@/api/behavior'
+import { listProducts, type ProductListItem } from '@/api/catalog'
+import ProductImage from '@/components/ProductImage.vue'
 
 interface ProfileDocument {
   artifactId?: string
@@ -70,13 +73,17 @@ interface ApiErrorLike {
   message?: string
 }
 
+const router = useRouter()
 const loading = ref(false)
 const refreshing = ref(false)
+const recommendationLoading = ref(false)
 const errorText = ref('')
 const latestProfile = ref<UserProfileLatest | null>(null)
 const agentContext = ref<AgentProfileContext | null>(null)
 const behaviorSummary = ref<BehaviorSummary | null>(null)
 const recentEvents = ref<BehaviorEvent[]>([])
+const recommendedProducts = ref<ProductListItem[]>([])
+const recommendationReasons = ref<Record<number, string>>({})
 
 const profileDocument = computed<ProfileDocument | null>(() => {
   const raw = latestProfile.value?.profileJson
@@ -173,11 +180,110 @@ async function loadInsights() {
     agentContext.value = context
     recentEvents.value = events
     behaviorSummary.value = summary
+    await loadProfileRecommendations()
   } catch (error) {
     errorText.value = resolveErrorMessage(error)
   } finally {
     loading.value = false
   }
+}
+
+async function loadProfileRecommendations() {
+  const keywords = recommendationKeywords()
+  recommendedProducts.value = []
+  recommendationReasons.value = {}
+
+  if (keywords.length === 0) {
+    return
+  }
+
+  recommendationLoading.value = true
+  try {
+    const productBySpu = new Map<number, ProductListItem>()
+    const reasonBySpu: Record<number, string> = {}
+    const suppressedSpuIds = new Set<number>(
+      [
+        ...fulfilledNeeds.value.map((item) => item.spuId),
+        ...doNotRecommend.value.map((item) => item.spuId),
+      ].filter((value): value is number => value != null),
+    )
+
+    for (const keyword of keywords) {
+      const page = await listProducts({
+        keyword,
+        page: 1,
+        size: 4,
+      })
+
+      for (const product of page.records) {
+        if (suppressedSpuIds.has(product.spuId) || productBySpu.has(product.spuId)) {
+          continue
+        }
+        productBySpu.set(product.spuId, product)
+        reasonBySpu[product.spuId] = keyword
+      }
+
+      if (productBySpu.size >= 6) {
+        break
+      }
+    }
+
+    recommendedProducts.value = Array.from(productBySpu.values()).slice(0, 6)
+    recommendationReasons.value = reasonBySpu
+  } finally {
+    recommendationLoading.value = false
+  }
+}
+
+function recommendationKeywords() {
+  const labels = complementOpportunities.value
+    .map((item) => item.label || '')
+    .filter(Boolean)
+
+  const rules: Array<[string[], string[]]> = [
+    [['mouse', '鼠标'], ['鼠标']],
+    [['wrist', '腕托'], ['腕托']],
+    [['desk mat', 'deskmat', '桌垫'], ['桌垫']],
+    [['pillowcase', '枕套'], ['枕套']],
+    [['bedding', '四件套', '床品'], ['四件套']],
+    [['aroma', '香薰', '助眠灯'], ['香薰']],
+    [['coffee bean', '咖啡豆'], ['咖啡豆']],
+    [['filter', '滤纸'], ['滤纸']],
+    [['thermos', '保温杯', '随行杯'], ['保温杯']],
+    [['organizer', '收纳包'], ['收纳包']],
+    [['power bank', '移动电源'], ['移动电源']],
+    [['travel bottle', '分装瓶'], ['分装瓶']],
+    [['sports bottle', '运动水杯'], ['运动水杯']],
+    [['towel', '毛巾'], ['毛巾']],
+    [['massage', '筋膜球'], ['筋膜球']],
+    [['cable', '理线'], ['理线']],
+    [['pen holder', '笔筒'], ['笔筒']],
+    [['clean', '清洁'], ['清洁']],
+  ]
+
+  const keywords: string[] = []
+  for (const label of labels) {
+    const normalized = label.toLowerCase()
+    for (const [patterns, terms] of rules) {
+      if (patterns.some((pattern) => normalized.includes(pattern.toLowerCase()))) {
+        keywords.push(...terms)
+      }
+    }
+  }
+
+  return Array.from(new Set(keywords)).slice(0, 8)
+}
+
+function formatProductPrice(product: ProductListItem) {
+  if (product.minPrice == null && product.maxPrice == null) return '价格待确认'
+  if (product.minPrice === product.maxPrice || product.maxPrice == null) {
+    return formatMoney(product.minPrice)
+  }
+  return `${formatMoney(product.minPrice)} - ${formatMoney(product.maxPrice)}`
+}
+
+function openProduct(product: ProductListItem) {
+  router.push(`/products/${product.spuId}`)
 }
 
 async function refreshCurrentProfile() {
@@ -416,6 +522,50 @@ onMounted(loadInsights)
           </el-table>
         </el-card>
 
+        <el-card class="full-width" shadow="never">
+          <template #header>
+            <div class="card-header">
+              <span>基于画像的推荐商品</span>
+              <el-tag type="success">来自配套机会匹配</el-tag>
+            </div>
+          </template>
+
+          <el-skeleton :loading="recommendationLoading" animated>
+            <el-empty
+              v-if="recommendedProducts.length === 0"
+              description="暂无可展示的画像推荐商品，请先产生支付或加购行为后刷新画像"
+            />
+            <div v-else class="recommendation-grid">
+              <article
+                v-for="product in recommendedProducts"
+                :key="product.spuId"
+                class="recommendation-card"
+                @click="openProduct(product)"
+              >
+                <ProductImage
+                  class="recommendation-image"
+                  :src="product.mainImageUrl"
+                  :label="product.brand || product.categoryName"
+                  :product-name="product.name"
+                  :category-name="product.categoryName"
+                />
+                <div class="recommendation-body">
+                  <div class="recommendation-meta">
+                    <el-tag size="small" type="success">{{ product.categoryName }}</el-tag>
+                    <span>{{ recommendationReasons[product.spuId] || 'profile' }}</span>
+                  </div>
+                  <strong>{{ product.name }}</strong>
+                  <p>{{ product.subtitle || '根据画像配套机会匹配的商品' }}</p>
+                  <div class="recommendation-footer">
+                    <span>{{ formatProductPrice(product) }}</span>
+                    <small>销量 {{ product.salesCount || 0 }}</small>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </el-skeleton>
+        </el-card>
+
         <el-card shadow="never">
           <template #header>
             <div class="card-header">
@@ -590,6 +740,85 @@ onMounted(loadInsights)
 .count-item strong {
   color: #1f2a37;
   font-size: 18px;
+}
+
+.recommendation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.recommendation-card {
+  overflow: hidden;
+  border: 1px solid #e3e9f0;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.recommendation-card:hover {
+  transform: translateY(-2px);
+  border-color: #9ccbbc;
+  box-shadow: 0 12px 26px rgba(31, 42, 55, 0.1);
+}
+
+.recommendation-image {
+  width: 100%;
+  height: 150px;
+}
+
+.recommendation-body {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.recommendation-meta,
+.recommendation-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.recommendation-meta span,
+.recommendation-footer small {
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommendation-body strong {
+  display: -webkit-box;
+  min-height: 42px;
+  overflow: hidden;
+  color: #1f2a37;
+  font-size: 16px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.recommendation-body p {
+  display: -webkit-box;
+  min-height: 40px;
+  margin: 0;
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.recommendation-footer span {
+  color: #d97706;
+  font-weight: 800;
 }
 
 .full-width {
