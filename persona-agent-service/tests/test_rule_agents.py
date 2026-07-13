@@ -124,14 +124,28 @@ def test_intent_agent_recognizes_fulfilled_and_does_not_continue_same_sku():
     assert not any(opportunity.label.lower().startswith("same sku") for opportunity in report.complement_opportunities)
 
 
-def test_complement_rules_cover_demo_showcase_categories():
+def test_complement_rules_use_keywords_as_recommendation_seeds():
+    """complement_labels now returns input keywords directly as recommendation seeds.
+
+    Previous rule-based mapping table has been replaced by behavior-driven
+    keyword generation. The DeepSeek API layer provides semantic complement
+    association instead of brittle string matching.
+    """
     labels = complement_labels(["枕头", "咖啡机", "背包", "瑜伽垫", "键盘"])
 
-    assert "枕套" in labels
-    assert "咖啡豆" in labels
-    assert "数码收纳包" in labels
-    assert "运动水杯" in labels
-    assert "无线鼠标" in labels
+    assert "枕头" in labels
+    assert "咖啡机" in labels
+    assert "背包" in labels
+    assert "瑜伽垫" in labels
+    assert "键盘" in labels
+
+    assert len(labels) == 5
+
+    single = complement_labels(["mouse"])
+    assert single == ["mouse"]
+
+    empty = complement_labels([])
+    assert empty == ["explore adjacent categories"]
 
 
 def test_trend_agent_outputs_rising_declining_and_noise_fields():
