@@ -240,38 +240,11 @@ function recommendationKeywords() {
     .map((item) => item.label || '')
     .filter(Boolean)
 
-  const rules: Array<[string[], string[]]> = [
-    [['mouse', '鼠标'], ['鼠标']],
-    [['wrist', '腕托'], ['腕托']],
-    [['desk mat', 'deskmat', '桌垫'], ['桌垫']],
-    [['pillowcase', '枕套'], ['枕套']],
-    [['bedding', '四件套', '床品'], ['四件套']],
-    [['aroma', '香薰', '助眠灯'], ['香薰']],
-    [['coffee bean', '咖啡豆'], ['咖啡豆']],
-    [['filter', '滤纸'], ['滤纸']],
-    [['thermos', '保温杯', '随行杯'], ['保温杯']],
-    [['organizer', '收纳包'], ['收纳包']],
-    [['power bank', '移动电源'], ['移动电源']],
-    [['travel bottle', '分装瓶'], ['分装瓶']],
-    [['sports bottle', '运动水杯'], ['运动水杯']],
-    [['towel', '毛巾'], ['毛巾']],
-    [['massage', '筋膜球'], ['筋膜球']],
-    [['cable', '理线'], ['理线']],
-    [['pen holder', '笔筒'], ['笔筒']],
-    [['clean', '清洁'], ['清洁']],
-  ]
-
-  const keywords: string[] = []
-  for (const label of labels) {
-    const normalized = label.toLowerCase()
-    for (const [patterns, terms] of rules) {
-      if (patterns.some((pattern) => normalized.includes(pattern.toLowerCase()))) {
-        keywords.push(...terms)
-      }
-    }
+  if (labels.length === 0) {
+    return []
   }
 
-  return Array.from(new Set(keywords)).slice(0, 8)
+  return labels.slice(0, 8)
 }
 
 function formatProductPrice(product: ProductListItem) {
