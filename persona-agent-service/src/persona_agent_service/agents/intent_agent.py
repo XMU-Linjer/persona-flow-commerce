@@ -80,17 +80,63 @@ class IntentAgent:
         ]
 
     def _complement_opportunities(self, context: AgentProfileContext, fulfilled_needs):
-        if not fulfilled_needs:
-            return []
-        keywords = context.recent_keywords or [" ".join(str(need.category_id or "") for need in fulfilled_needs)]
+        """Generate complement opportunities from all user behavior signals.
+
+        Previous design required payment (fulfilled_needs != []) to trigger
+        complements.  The revised approach derives recommendation keywords
+        from any signal the user has demonstrated — search terms, viewed
+        categories, cart adds, favorites — so that profiles begin building
+        before the first purchase and are continuously enriched afterwards.
+        """
+        keywords = list(dict.fromkeys(context.recent_keywords))
+        if fulfilled_needs:
+            keywords.extend(
+                str(need.category_id or "")
+                for need in fulfilled_needs
+                if need.category_id is not None
+            )
         labels = complement_labels(keywords)
-        first_need = fulfilled_needs[0]
+        if not labels:
+            return []
+
+        primary_evidence = context.evidence[:3] if context.evidence else []
+        primary_evidence_refs = [
+            EvidenceRef(
+                eventId=ev.event_id or "context",
+                eventType=ev.event_type or "INTEREST_SIGNAL",
+                reason=ev.reason or "interest_signal",
+            )
+            for ev in primary_evidence
+        ]
+        if not primary_evidence_refs and context.recent_events:
+            for event in context.recent_events[:3]:
+                primary_evidence_refs.append(
+                    EvidenceRef(
+                        eventId=event.event_id or "context",
+                        eventType=event.event_type or "INTEREST_SIGNAL",
+                        reason="recent_behavior",
+                    )
+                )
+
+        first_related_sku = (
+            fulfilled_needs[0].sku_id
+            if fulfilled_needs and fulfilled_needs[0].sku_id is not None
+            else next(
+                (
+                    event.sku_id
+                    for event in context.recent_events
+                    if event.sku_id is not None
+                ),
+                None,
+            )
+        )
+
         return [
             ComplementOpportunity(
                 label=label,
-                relatedFulfilledSkuId=first_need.sku_id,
-                complementScore=0.72,
-                evidence=first_need.evidence,
+                relatedFulfilledSkuId=first_related_sku,
+                complementScore=0.68,
+                evidence=primary_evidence_refs,
             )
             for label in labels
         ]

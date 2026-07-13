@@ -5,6 +5,7 @@ from persona_agent_service.agents.complement_rules import complement_labels
 from persona_agent_service.schemas.artifacts import (
     BehaviorFactReport,
     ComplementOpportunity,
+    EvidenceRef,
     IntentReport,
     ProfileAuditReport,
     ProfileDraft,
@@ -175,16 +176,45 @@ class ProfileBuilderCritic:
     def _complements(self, context: AgentProfileContext, intent_report: IntentReport) -> list[ComplementOpportunity]:
         if intent_report.complement_opportunities:
             return intent_report.complement_opportunities
-        if not intent_report.fulfilled_needs:
+
+        keywords = list(dict.fromkeys(context.recent_keywords))
+        if not keywords:
             return []
-        labels = complement_labels(context.recent_keywords)
-        first_need = intent_report.fulfilled_needs[0]
+
+        labels = complement_labels(keywords)
+        if not labels:
+            return []
+
+        evidence = context.evidence[:3] if context.evidence else []
+        evidence_refs = [
+            EvidenceRef(
+                eventId=ev.event_id or "context",
+                eventType=ev.event_type or "INTEREST_SIGNAL",
+                reason=ev.reason or "interest_signal",
+            )
+            for ev in evidence
+        ]
+        if not evidence_refs and context.recent_events:
+            for event in context.recent_events[:3]:
+                evidence_refs.append(
+                    EvidenceRef(
+                        eventId=event.event_id or "context",
+                        eventType=event.event_type or "INTEREST_SIGNAL",
+                        reason="recent_behavior",
+                    )
+                )
+
+        first_related_sku = next(
+            (event.sku_id for event in context.recent_events if event.sku_id is not None),
+            None,
+        )
+
         return [
             ComplementOpportunity(
                 label=label,
-                relatedFulfilledSkuId=first_need.sku_id,
-                complementScore=0.68,
-                evidence=first_need.evidence,
+                relatedFulfilledSkuId=first_related_sku,
+                complementScore=0.65,
+                evidence=evidence_refs,
             )
             for label in labels
         ]
