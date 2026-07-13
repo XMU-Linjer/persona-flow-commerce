@@ -5,6 +5,7 @@ import com.personaflow.commerce.behavior.entity.BehaviorEventEntity;
 import com.personaflow.commerce.behavior.enums.BehaviorEventType;
 import com.personaflow.commerce.behavior.service.BehaviorConsumeLogService;
 import com.personaflow.commerce.behavior.service.BehaviorEventService;
+import com.personaflow.commerce.behavior.service.ProfileRefreshScheduler;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,13 +42,16 @@ class BehaviorEventConsumerTest {
     private BehaviorConsumeLogService consumeLogService;
 
     @Mock
+    private ProfileRefreshScheduler profileRefreshScheduler;
+
+    @Mock
     private Channel channel;
 
     private BehaviorEventConsumer consumer;
 
     @BeforeEach
     void setUp() {
-        consumer = new BehaviorEventConsumer(behaviorEventService, consumeLogService);
+        consumer = new BehaviorEventConsumer(behaviorEventService, consumeLogService, profileRefreshScheduler);
     }
 
     @Test

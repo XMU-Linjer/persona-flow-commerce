@@ -4,6 +4,7 @@ import com.personaflow.commerce.behavior.dto.BehaviorEventCreateCommand;
 import com.personaflow.commerce.behavior.enums.BehaviorEventType;
 import com.personaflow.commerce.behavior.service.BehaviorConsumeLogService;
 import com.personaflow.commerce.behavior.service.BehaviorEventService;
+import com.personaflow.commerce.behavior.service.ProfileRefreshScheduler;
 import com.rabbitmq.client.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,13 +22,16 @@ public class BehaviorEventConsumer {
 
     private final BehaviorEventService behaviorEventService;
     private final BehaviorConsumeLogService consumeLogService;
+    private final ProfileRefreshScheduler profileRefreshScheduler;
 
     public BehaviorEventConsumer(
             BehaviorEventService behaviorEventService,
-            BehaviorConsumeLogService consumeLogService
+            BehaviorConsumeLogService consumeLogService,
+            ProfileRefreshScheduler profileRefreshScheduler
     ) {
         this.behaviorEventService = behaviorEventService;
         this.consumeLogService = consumeLogService;
+        this.profileRefreshScheduler = profileRefreshScheduler;
     }
 
     @RabbitListener(
@@ -59,6 +63,7 @@ public class BehaviorEventConsumer {
             channel.basicAck(deliveryTag, false);
             log.info("Behavior message persisted messageId={}, eventId={}, eventType={}",
                     message.messageId(), message.eventId(), message.eventType());
+            profileRefreshScheduler.onNewEvent(message.userId());
         } catch (Exception exception) {
             log.warn(
                     "Behavior message failed messageId={}, eventId={}, eventType={}, errorType={}, reason={}",

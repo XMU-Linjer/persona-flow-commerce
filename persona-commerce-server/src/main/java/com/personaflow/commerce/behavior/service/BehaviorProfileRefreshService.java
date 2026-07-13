@@ -47,6 +47,16 @@ public class BehaviorProfileRefreshService {
     @Transactional
     public UserProfileLatestVO refreshCurrentUserProfile(Integer days) {
         Long userId = currentUserProvider.requireCurrentUser().userId();
+        UserProfileVersionEntity saved = doRefresh(userId, days);
+        return UserProfileLatestVO.from(userId, Optional.of(saved));
+    }
+
+    @Transactional
+    public void refreshByUserId(Long userId, Integer days) {
+        doRefresh(userId, days);
+    }
+
+    private UserProfileVersionEntity doRefresh(Long userId, Integer days) {
         long startedAt = System.nanoTime();
         log.info("Profile refresh started userId={}, days={}", userId, days);
         try {
@@ -79,7 +89,7 @@ public class BehaviorProfileRefreshService {
                     saved.getVersionNo(),
                     elapsedMillis(startedAt)
             );
-            return UserProfileLatestVO.from(userId, Optional.of(saved));
+            return saved;
         } catch (RuntimeException exception) {
             log.warn(
                     "Profile refresh failed userId={}, days={}, elapsedMs={}, errorType={}, reason={}",
